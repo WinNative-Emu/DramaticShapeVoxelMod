@@ -23,14 +23,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # The mod and the engine are checked out as siblings, never nested: the
+      # engine tree reads the ROM-derived cache all over its tests and tools,
+      # and modkit walks whatever sits under the mod directory, so an engine
+      # checked out inside the mod fails validation as if the mod shipped it.
       - uses: actions/checkout@v4
         with:
           ref: winnative
           fetch-depth: 0
+          path: mod
 
       - name: Sync upstream
         id: sync
         if: github.event_name != 'push'
+        working-directory: mod
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -71,6 +77,7 @@ jobs:
 
       - name: Has the source changed since the last release?
         id: src
+        working-directory: mod
         run: |
           # The last commit touching anything outside .github, so editing the
           # workflow never triggers a repack. modkit pack is reproducible, but
@@ -80,7 +87,7 @@ jobs:
           prev=$(curl -sfL "https://github.com/${GITHUB_REPOSITORY}/releases/download/latest/source.sha" | tr -d '[:space:]' || true)
           echo "source    $src"
           echo "published ${prev:-<none>}"
-          echo "$src" > source.sha
+          echo "$src" > "$GITHUB_WORKSPACE/source.sha"
           if [ "$src" = "$prev" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "This source has already been packed and released; nothing to do."
@@ -110,7 +117,7 @@ jobs:
           # archive is reproducible, which is what lets Retro-Consoles skip a
           # rebuild when nothing actually moved.
           mkdir -p dist
-          python3 engine/tools/modkit.py pack . -o "dist/${MOD_ID}.zip"
+          python3 engine/tools/modkit.py pack mod -o "dist/${MOD_ID}.zip"
           ls -l dist
 
       - uses: actions/upload-artifact@v4
