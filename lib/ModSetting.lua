@@ -114,6 +114,15 @@ function ModSetting:row()
       self_:cycle(game, dir)
       return true
     end,
+    -- The whole ladder, for a host that can show one. The engine's own OPTIONS
+    -- screen only ever cycles a row, so `value` and `step` are all it needs;
+    -- WinNative draws a dropdown instead and cannot infer the list from those
+    -- two. Nothing outside this mod knows what a mod's setting cycles through,
+    -- so saying it here is the only way these rows become dropdowns rather
+    -- than a pair of arrows. Ignored by any host that does not ask for it.
+    choices = function()
+      return self_.labels, self_:read()
+    end,
   }
 end
 
