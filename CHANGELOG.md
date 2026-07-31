@@ -1,5 +1,192 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- **BACK SPRITES, a new row under 3D-BTL: your own Pokémon stays on the battle menu.**
+  The staged shot stands both mons on the map, which is the mode's whole claim
+  -- and it costs the framing Gen 1 is most recognisable by: your own Pokémon,
+  seen from behind, sitting on top of the battle menu with its feet on the box.
+
+  With BACK SPRITES on the foe is still geometry standing on its own tile at the far
+  end of the arena, and the player's side goes back to being the GB's own flat
+  back pic in the GB's own slot: same art, same 2x, same feet on row 96. It is
+  the engine's own pics layer that draws it, through the `onlySide` argument
+  that layer already takes, so every pic effect -- the grow-out-of-the-ball,
+  the faint slide, the damage blink, the send-out trainer pic -- comes along
+  unchanged and none of it is reimplemented.
+
+  Nothing else about the shot moves. The arena, the camera and the drift are
+  solved exactly as they were, so the foe stands where it always stood and the
+  player's cell is simply empty ground in the foreground. Two things follow the
+  setting: the `pokemon.sprite` hook stops asking for the front pic on the
+  player's side (it is a back view again, and the front art would be that mon
+  turned round to face the player it belongs to), and the move-animation offset
+  drops that side's contribution, because a pic that has not moved cannot have
+  moved the pair's centre.
+
+  OFF by default -- what the mode advertises is the two of them out there --
+  and only on the OPTIONS menu while 3D-BTL is on, since with staged battles
+  off the engine already draws exactly this.
+
+### Fixed
+
+- **Battle pics were see-through, and it took a back sprite on a tiled floor
+  to make it obvious.** Gen 1 pics are two-bit art whose lightest shade is
+  white, and the decoded PNGs key that shade to alpha 0 -- which cost nothing
+  when the field behind them was white too. Over a route, every belly, every
+  eye white and every highlight is a hole with the world showing through, and
+  the mon reads as a stencil.
+
+  `BattlePics` exists to put that paper back and, as written, put none of it
+  back. It flood-filled the outside from the border and filled what the flood
+  could not reach, which is exact and, on this game's art, empty: a Gen 1
+  figure is an open drawing, and its belly walks out to the border through the
+  gap between its legs. Read across all 305 of the game's battle pics, that
+  rule finds an enclosed hole in exactly none of them.
+
+  The fix is to start the flood somewhere else: at the edges of the ARTWORK'S
+  OWN BOUNDING BOX, and at three of them -- left, right and top. The bottom is
+  closed, because it is not a side the background is behind, it is where the
+  drawing was CUT. A pic is bottom-aligned in its slot with all the margin at
+  the top, so a mon's lowest row is the last row it was given and everything
+  below the belly simply stops. Treat that cut as open and the background
+  pours up inside the figure, which is the channel of world that used to show
+  through a Clefairy.
+
+  That is exact rather than a heuristic: nothing is filled because of what
+  surrounds it, only because the background provably cannot reach it. Which is
+  why it needs no idea whether it is holding a front pic or a back one -- the
+  sky between a pair of ears reaches the top edge and stays sky, the gap
+  between a body and a raised tail reaches the side and stays gap, the belly
+  reaches neither and is paper. The silhouette is untouched, so the mon still
+  cuts cleanly against the world.
+
+  It replaces the border flood outright rather than sitting beside it, since
+  anything the border could not reach the box edges cannot reach either.
+
+  The bottom edge needs one more distinction, because two different things
+  meet the underside of a figure. A DRAIN is where the drawing ran out -- a
+  belly whose white carries on down until the artist stopped, leaking out
+  through the inch between a body and a leg -- and is sealed. A MOUTH is the
+  space between two legs, background that happens to be enclosed on three
+  sides, and is left open so the world shows through a trainer's stride.
+
+  Width tells them apart, and on this game's art it is not a close call.
+  Measured along the bottom of every battle pic, the drains run 3 and 4 pixels
+  (Clefairy's back, Wartortle's back, Red's back) and the mouths run 10, 12, 14
+  and 17 (a Rattata's underbelly, Blue's stride, Brock's, a Pikachu's back).
+  Nothing lands between 4 and 10, so the cut is taken at 6 with room either
+  side rather than tuned to one sprite. Apart from that number the rule stays
+  exact.
+
+  Front pics come back untouched, and not by being special-cased: they are
+  near-solid silhouettes with almost nothing inside them to fill, so their own
+  shape is what says so.
+
+  Both mons were affected -- the cards in the arena as much as anything -- so
+  this lands wherever a battle pic is drawn over the world, not just under
+  BACK SPRITES.
+
+- **The pinned back pic was lit at noon while the world behind it was not.**
+  Everything standing in the arena goes through the voxel shader, and that
+  shader multiplies by the hour's tint, so at dusk the diorama warms and at
+  night it goes blue -- the two mons' cards included, because they are drawn
+  in the same pass as the ground they stand on. A back pic pinned to the menu
+  is not in that pass; it is a flat blit over the finished shot, and it stayed
+  bright over a midnight route.
+
+  The same tint is now applied to that one draw, by multiplying every colour
+  the pics layer sets on its way past -- so the alpha, the faint slide's fade
+  and the damage blink all compose with it instead of being overwritten. What
+  it does not get is the sun: the cards are shadow-mapped and a pic pinned to
+  the menu has no position in the scene to be shadowed at, so it carries the
+  hour and not the weather.
+
+### Added
+
+- **The hour reaches the FLAT world too, not just the diorama.** DAYTIME drove
+  the 3D pass through the voxel shader's own tint uniform -- a uniform the 2D
+  tile path never runs -- so with VOXEL off, the same evening that fell on the
+  diorama left the flat world at permanent noon. One clock, two worlds, one of
+  them ignoring it. Outdoor maps now get the same multiply, painted as one
+  rectangle over the composited world.
+
+  The whole difficulty is WHERE, and it is worth writing down. Not on the world
+  canvas: in a colorized mode that canvas is grayscale art and the blit that
+  puts it on screen runs it through the palette shader, which classifies each
+  pixel into a shade BY ITS RED CHANNEL -- multiply a night blue over it first
+  and every pixel lands in the wrong bucket, so the world does not darken, it
+  changes colour. Not over the finished frame either, or the dialog boxes and
+  menus darken along with the world they are held up in front of, which is the
+  same reason the tilt-shift blur is a `worldPresent` and not a `present`.
+
+  Which leaves the instant between the world blit and the UI blit, and the
+  engine has no seam there -- `worldPresent` only runs when a PIPELINE produced
+  the world, which in flat mode is precisely what did not happen. So
+  `Renderer:endFrame` is wrapped and the UI canvas's own draw is watched for:
+  `blit` passes the canvas it is compositing as the first argument, so the
+  first draw of `Renderer.canvas` IS the boundary, by identity rather than by
+  counting. The shader and scissor that call arrives under belong to the UI
+  blit already in progress, so both are put aside for the rectangle and handed
+  straight back.
+
+  Skipped entirely when a pipeline drew the frame (it tinted itself, and twice
+  is wrong), indoors (a room has no sky to take its light from), and at midday
+  (a multiply by white) -- so a game with the clock at DAY issues not one extra
+  call.
+
+### Changed
+
+- **FULL no longer takes the two battle rows off the menu.** It still owns the
+  rows that describe the LOOK -- the wireframe, the horizon bend, the blur, the
+  hour -- because it is a preset for the diorama and a row that no longer
+  decides anything is worse than no row. 3D-BTL and BACK SPRITES are not that:
+  one decides what a fight is drawn OVER and the other how it is framed.
+  FULL still SETS both on arrival; it does not hold them, and leaving them
+  reachable is the difference between a preset and a lock.
+
+  This makes `stagedBattles()` honest as a side effect. It used to answer yes
+  under FULL as well, on the grounds that FULL owned the 3D-BTL row and
+  switched it on -- safe only while the row was hidden. With the row reachable
+  from inside FULL, that clause would have claimed staged battles for a preset
+  the player had just switched them off inside, pinning BATTLE LAYOUT to OG for
+  a fight that never gets staged. The row is the only thing that decides now,
+  which is what `OverworldBattle.begin` and `wantsFront` already believed.
+
+- **TILT and GBC FX are off the OPTIONS menu entirely while this mod is
+  installed.** Both fight the diorama and both were already half-taken: the
+  mode's own key forces them off on every press, and the registry switches
+  TILT off whenever a world pipeline takes the pass. What was left was two
+  rows a player could set and watch get reverted -- TILT being the flat fake
+  of what this mode does for real, and GBC FX a full-screen present pass over
+  the top of the whole thing.
+
+  Dropped AND held at zero, which is the part that matters: hiding a live
+  setting is a trap, because a save written before the mod was installed can
+  carry TILT 3 and a row that is not there cannot turn it back off. Pinned
+  wherever the value could arrive from -- the menu opening, a save being
+  loaded or begun -- so there is no route by which either is on and
+  unreachable. Uninstalling the mod puts both rows back, at whatever they were
+  last set to.
+
+- **The battle's text box and menus are frosted glass, like the HUDs.** The
+  HUD blocks got panels because black glyphs on grass are not readable. The box
+  at the bottom had the opposite problem and the same cause: it is drawn as an
+  opaque white slab with a black border, which was the field's own colour back
+  when the field was white and is a sheet of paper laid over the bottom third
+  of the diorama now that it is not.
+
+  It gets exactly what the HUDs get -- the world behind it, blurred to frosted
+  glass and laid back down translucent, at the same frost and the same tint --
+  and it is measured into the same brightness verdict, so the ink over the menu
+  flips white with the ink over the HUDs rather than against it. Only the FILL
+  is taken away: the border, the text, the cursor and the down arrow are the
+  engine's own glyphs in their own places. The move menu's TYPE/PP box and
+  Mimic's copy menu get their own panels, trimmed to the rows above the box
+  below them so no pixel is frosted twice.
+
 ## 1.2.1
 
 ### Fixed
