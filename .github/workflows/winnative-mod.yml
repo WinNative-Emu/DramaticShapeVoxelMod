@@ -112,6 +112,12 @@ jobs:
           ref: winnative
           path: engine
 
+      - name: Give modkit a headless love
+        if: steps.src.outputs.changed == 'true'
+        run: |
+          chmod +x engine/scripts/winnative_modkit_love.sh
+          engine/scripts/winnative_modkit_love.sh
+
       - name: Pack
         if: steps.src.outputs.changed == 'true'
         run: |
