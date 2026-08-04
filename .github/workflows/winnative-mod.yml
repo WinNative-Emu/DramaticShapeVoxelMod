@@ -1,0 +1,160 @@
+name: mod
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 21 * * *"
+  push:
+    branches: [winnative]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  GH_REPO: ${{ github.repository }}
+  SYNC_BRANCH: winnative
+  MOD_ID: DRAMATIC_SHAPE
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # The mod and the engine are checked out as siblings, never nested: the
+      # engine tree reads the ROM-derived cache all over its tests and tools,
+      # and modkit walks whatever sits under the mod directory, so an engine
+      # checked out inside the mod fails validation as if the mod shipped it.
+      - uses: actions/checkout@v4
+        with:
+          ref: winnative
+          fetch-depth: 0
+          path: mod
+
+      - name: Sync upstream
+        id: sync
+        if: github.event_name != 'push'
+        working-directory: mod
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          parent=$(gh repo view "$GITHUB_REPOSITORY" --json parent --jq 'if .parent then .parent.owner.login + "/" + .parent.name else "" end')
+          if [ -z "$parent" ]; then
+            echo "No upstream parent; building the branch as-is."
+            exit 0
+          fi
+          branch=$(gh repo view "$parent" --json defaultBranchRef --jq .defaultBranchRef.name)
+          echo "upstream $parent@$branch"
+          git config user.name "winnative-ci"
+          git config user.email "ci@winnative.dev"
+          git remote add upstream "https://github.com/$parent.git" 2>/dev/null || \
+            git remote set-url upstream "https://github.com/$parent.git"
+          git fetch --no-tags upstream "$branch"
+          before=$(git rev-parse HEAD)
+          if ! git merge --no-edit "upstream/$branch"; then
+            git merge --abort || git reset --hard "$before"
+            echo "::warning::Upstream merge conflicts; $SYNC_BRANCH left untouched. Resolve by hand, then re-run."
+            exit 0
+          fi
+          after=$(git rev-parse HEAD)
+          if [ "$before" = "$after" ]; then
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+          if ! git push origin "HEAD:$SYNC_BRANCH"; then
+            git fetch --no-tags origin "$SYNC_BRANCH"
+            if git merge --no-edit "origin/$SYNC_BRANCH" && git push origin "HEAD:$SYNC_BRANCH"; then
+              echo "Re-merged a concurrent update to $SYNC_BRANCH."
+            else
+              git merge --abort || true
+              echo "::warning::$SYNC_BRANCH moved during the run; skipping. The next run picks it up."
+              exit 0
+            fi
+          fi
+          echo "Merged $(git rev-list --count $before..$after) upstream commit(s)."
+
+      - name: Has the source changed since the last release?
+        id: src
+        working-directory: mod
+        run: |
+          # The last commit touching anything outside .github, so editing the
+          # workflow never triggers a repack. modkit pack is reproducible, but
+          # the engine checkout it validates against is not pinned here, so the
+          # source commit stays the authority on whether to publish.
+          src=$(git log -1 --format=%H -- . ':(exclude).github')
+          prev=$(curl -sfL "https://github.com/${GITHUB_REPOSITORY}/releases/download/latest/source.sha" | tr -d '[:space:]' || true)
+          echo "source    $src"
+          echo "published ${prev:-<none>}"
+          echo "$src" > "$GITHUB_WORKSPACE/source.sha"
+          if [ "$src" = "$prev" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "This source has already been packed and released; nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install luajit
+        if: steps.src.outputs.changed == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq luajit
+
+      - name: Check out the engine for modkit
+        if: steps.src.outputs.changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: WinNative-Emu/gen1recomp
+          ref: winnative
+          path: engine
+
+      - name: Pack
+        if: steps.src.outputs.changed == 'true'
+        run: |
+          # modkit pack runs `validate --strict` first, so a mod that would not
+          # load on a fresh install fails the run rather than shipping. The
+          # archive is reproducible, which is what lets Retro-Consoles skip a
+          # rebuild when nothing actually moved.
+          mkdir -p dist
+          python3 engine/tools/modkit.py pack mod -o "dist/${MOD_ID}.zip"
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        if: steps.src.outputs.changed == 'true'
+        with:
+          name: ${{ env.MOD_ID }}.zip
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: Publish release
+        if: steps.src.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          changed=0
+          for f in dist/*.zip; do
+            name=$(basename "$f")
+            prev=$(mktemp -d)/"$name"
+            if gh release download latest --pattern "$name" --output "$prev" 2>/dev/null && cmp -s "$prev" "$f"; then
+              echo "$name unchanged"
+            else
+              echo "$name changed"
+              changed=1
+            fi
+          done
+          if [ "$changed" = "0" ]; then
+            echo "Every artifact is byte-identical to the published release; nothing to publish."
+            exit 0
+          fi
+          tag="build-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            gh release create "$tag" --title "$tag" --notes "Mod package from ${GITHUB_SHA}"
+          fi
+          gh release upload "$tag" dist/*.zip source.sha --clobber
+          if ! gh release view latest > /dev/null 2>&1; then
+            gh release create latest --title latest --notes "Rolling build."
+          fi
+          gh release upload latest dist/*.zip source.sha --clobber
+          gh release edit latest --notes "Rolling; newest immutable tag: $tag"
+          echo "$tag"
