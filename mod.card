@@ -4,11 +4,12 @@ return {
   summary = "The overworld as a 3D diorama, and battles fought on it: real occlusion, tilt-shift, over-the-shoulder fights.",
   author = "DramaticShape",
   contact = "https://github.com/DramaticShape/DRAMATIC_SHAPE",
-  tags = { "graphics", "3d", "voxel", "render-pipeline", "presentation",
+  tags = { "graphics", "3d", "voxel", "true-3d", "render-pipeline", "presentation",
            "battle" },
   differences = {
     changed = {
       "with VOXEL on, the overworld draws as 3D geometry instead of flat tiles",
+      "FULL and TRUE 3D are two rungs of one ladder, so exactly one is ever on",
       "occlusion comes from a depth buffer rather than a y-sort, so buildings really hide what is behind them",
       "with 3D-BTL on, a battle draws over the map's nearest clear ground instead of over a white field",
       "the battle's text box and menu are frosted glass over that ground rather than an opaque white slab, on the same panels the HUDs sit on",
@@ -18,7 +19,10 @@ return {
       "hotkeys 3 and 5 are taken over from those two, which have no key and no row while this is loaded",
     },
     added = {
-      "VOXEL options row and hotkey 3 (OFF / 15 / 35 / 50 / 75 degrees)",
+      "VOXEL options row and hotkey 3 (OFF / FULL / 3D / 15 / 35 / 50 / 75)",
+      "a TRUE 3D preset where every character, NPC and battling Pokemon is real "
+      .. "geometry carved on the device from the views its own art already holds, "
+      .. "and turns to face where it is walking instead of always facing south",
       "T-SHIFT options row and hotkey 6 (OFF / 1 / 2 / 3), the miniature blur",
       "V-GRID on hotkey 5 and V-CURVE on hotkey 7",
       "3D-BTL on hotkey 8 (ON / OFF, on by default), battles fought on the world map",
@@ -35,6 +39,8 @@ return {
       "the battle backdrop renders at the GB's 160x144 to match the pics composited over it, so it is chunkier than the free-roam pass",
       "menus and cutscenes are unaffected -- outside a battle the mode only draws the free-roam overworld",
       "terrain meshes are cached per map, so the first frame after entering a large map costs a build",
+      "TRUE 3D needs pixel access to the sprite sheets; without it an actor keeps the flat card it always had",
+      "a battling Pokemon is a body of revolution, not a sculpt -- the ROM holds no side view of one to carve from",
     },
   },
   credits = {

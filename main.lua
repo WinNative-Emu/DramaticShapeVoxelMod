@@ -78,6 +78,7 @@ local ChunkMesher = V.require("ChunkMesher")
 local VoxelGrid = V.require("VoxelGrid")
 local WorldCurve = V.require("WorldCurve")
 local OverworldBattle = V.require("OverworldBattle")
+local ActorHull = V.require("ActorHull")
 local BattleExit = V.require("BattleExit")
 local DayNight = V.require("DayNight")
 local DayTint = V.require("DayTint")
@@ -216,6 +217,7 @@ mod.content.render_pipelines:register("voxel", {
   invalidate = function()
     Voxel3D.invalidate()
     OverworldBattle.invalidate()
+    ActorHull.invalidate()
     ChunkMesher.invalidate()   -- no map id = every cached mesh
   end,
 })
@@ -264,7 +266,7 @@ mod.content.render_pipelines:register("tiltshift", {
 local fullWas = nil
 
 applyFull = function(level)
-  local isFull = Voxel.isFull(level)
+  local isFull = Voxel.isPreset(level)
   local was = fullWas
   fullWas = isFull
   if not isFull or was == true or was == nil then return end
@@ -561,7 +563,7 @@ mod.hooks:wrap("ui.options.rows", function(next, game, rows)
     OverworldBattle.forceOG(game)
     dropRow(out, "battleLayout")
   end
-  local full = Voxel.isFull(Pipelines.level("voxel"))
+  local full = Voxel.isPreset(Pipelines.level("voxel"))
   if full then
     -- FULL owns the rows that PARAMETERISE the diorama -- the wireframe, the
     -- horizon bend, the blur, the hour -- so those come off the menu and
@@ -605,7 +607,7 @@ mod.events:on("mod.options_changed", function(payload)
   -- straight back to SYNC -- the OPTIONS row is hidden, but the manager's is
   -- not, and FULL's pin must hold against both
   local Pipelines = require("src.render.Pipelines")
-  if Voxel.isFull(Pipelines.level("voxel")) then DayNight.forceSync() end
+  if Voxel.isPreset(Pipelines.level("voxel")) then DayNight.forceSync() end
 end)
 
 -- ------- keeping the geometry in step with the world
@@ -720,7 +722,7 @@ do
       inner(self, dt)
       local after = Pipelines.level("voxel")
       local crossedFull = after ~= before
-                          and (Voxel.isFull(before) or Voxel.isFull(after))
+                          and (Voxel.isPreset(before) or Voxel.isPreset(after))
       if crossedFull or OverworldBattle.enabled() ~= hadBattles then
         local rebuilt = OptionsMenu.new(self.game)
         self.rows = rebuilt.rows
@@ -848,7 +850,7 @@ mod.hooks:wrap("world.tod", function(next, tod, ctx)
   return DayNight.tod()
 end)
 
-mod.exports.version = "1.3.0"
+mod.exports.version = "1.4.0"
 -- exposed so a companion mod can pin its own tiles' shapes or read the
 -- camera without reaching into this mod's file layout
 mod.exports.lib = V

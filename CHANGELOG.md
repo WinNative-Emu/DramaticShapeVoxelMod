@@ -1,5 +1,85 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+
+- **TRUE 3D: a second preset on the VOXEL row, where actors are geometry
+  rather than cards.** The ladder is now OFF / FULL / 3D / 15 / 35 / 50 / 75,
+  and 3D is FULL with one thing changed: every character, NPC and battling
+  Pokemon is carried by real 3D geometry instead of a flat quad.
+
+  The two presets are two rungs of ONE ladder, which is what makes them
+  mutually exclusive with nothing to enforce it -- an integer cannot hold
+  both, and the save, the OPTIONS row and the host's dropdown all carry that
+  same integer.
+
+  A character's hull is a VISUAL HULL carved from the three orthographic
+  views its own sheet already holds. `data/sprites/facings.asm` gives Gen 1
+  overworld art six drawn poses -- standing and walking, down, up and left --
+  which is exactly the front, back and side a space carve needs:
+
+      solid(x, y, z) = ( front[y,x] OR back'[y,x] ) AND side[y,z]
+
+  `back'` is the back frame mirrored so it registers with the front. The OR
+  is deliberate: front and back constrain the SAME axis, so ANDing them
+  erodes the body wherever two frames of walk art disagree, and they disagree
+  often. Only the orthogonal side view carves depth, and that still ANDs.
+
+  Nothing is shipped for this. The carve runs on the device, on the sheet the
+  engine already handed over, through the same cooperative build budget the
+  terrain uses, and the result lives in RAM and is never written anywhere.
+  That is the whole difference from the carved models this mod removed in
+  1.1.0: those were ~70 generated files describing the ROM's art, and a mod
+  that otherwise ships no game data had no business carrying them.
+
+  What it buys, beyond the obvious: **a hull can turn.** A card cannot, which
+  is why every figure in FULL faces south forever and right-facing is a
+  mirror trick. In 3D a character yaws to its heading, so one hull per sheet
+  and pose serves all four facings -- fewer meshes than the card path it
+  replaces, not more.
+
+- **Battling Pokemon stand as solids too.** A pic gives only two views and
+  both are frontal -- fronts are up to 7x7 tiles, backs are 4x4, and the ROM
+  has no side view of a Pokemon anywhere -- so there is nothing to carve
+  depth from and inventing one would draw a body nobody drew. Instead each
+  row of the pic is turned in depth the way `Structures` already turns a tree
+  canopy: the row's own span gives a centre and a half-width, and every
+  column runs that circle's chord. The front view is the pic; the plan view
+  is the pic's own width profile revolved. It is a rounded solid rather than
+  a sculpt, and it is the most a pair of frontal views honestly supports.
+
+  The relief is carved once per pic from a readback of the layer the engine
+  itself drew, so species palettes, shiny recolours and a mod's replacement
+  art all come through -- and every per-frame effect (the faint slide, the
+  damage blink, the squish, the grow-out-of-the-ball) still arrives through
+  the live texture, unchanged, because only the SHAPE is cached.
+
+### Changed
+
+- The player's occlusion silhouette keeps the flat quad in every mode. This
+  is load-bearing rather than tidiness: that pass draws with the depth test
+  INVERTED, so a mesh carrying both front and back faces reads its own back
+  faces as "behind something" and repaints the figure on open ground whether
+  or not anything hides it. An outline is the right mesh for a silhouette,
+  and separating the two is what lets the solid draw be a solid.
+
+- A hull's flanks and cap no longer paint their outline. The silhouette's
+  edge columns of GB art are all darkest-shade outline, so a flank sampling
+  its own column went solid black the moment the camera turned, and a cap
+  sampling its top row blacked out every head. Both now walk inward past the
+  dark pixels for material -- the same rule `Structures.roundTemplate`
+  already applies to its tree hulls, for the same reason.
+
+- The sun sees a hull as it stands. A card is drawn leaning and cast upright,
+  and needs the two transforms kept apart; a hull is simply where it is, so
+  it casts through its own matrix with no snug and no flatten.
+
+- `BattleBillboard.matrix` scales depth by the card's own width instead of
+  leaving it at 1, so a relief's depth is in the same units as its width. The
+  flat card is unaffected -- every one of its vertices sits at z = 0.
+
+
 ## 1.3.0
 
 ### Added

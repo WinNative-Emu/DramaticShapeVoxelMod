@@ -7,6 +7,7 @@
 tests/arena_pick.lua
 tests/battle_shots.lua
 tests/dramatic_shape_test.lua
+tests/actor_hull_test.lua
 tests/voxel_anim_probe.lua
 tests/voxel_door_probe.lua
 tests/voxel_mem_probe.lua

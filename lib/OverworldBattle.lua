@@ -405,6 +405,7 @@ function OverworldBattle.finish()
   restoreCast()
   session = nil
   Voxel3D.camera = nil
+  V.require("MonRelief").invalidate()
 end
 
 -- ------- per-frame
@@ -510,6 +511,7 @@ function OverworldBattle.invalidate()
   BattleDOF.invalidate()
   BattleHud.invalidate()
   BattlePics.invalidate()
+  V.require("MonRelief").invalidate()
 end
 
 -- ------- the battle screen's background
@@ -745,14 +747,18 @@ function OverworldBattle.sideTexture(battle, side)
 
   local ax, ay = TEX_AX, TEX_AY
   local trainer = false
+  local pic = battle[side] and battle[side].sprite or nil
   -- The intro trainer pic draws itself straight into its own 7x7 slot rather
   -- than through the placement helpers, so it is hung from that slot instead.
   if side == "enemy" and battle.showEnemyTrainer and battle.trainerPic then
     ax, ay, trainer = TRAINER_AX, TRAINER_AY, true
+    pic = battle.trainerPic
   elseif side == "player" and battle.showPlayerBack and battle.playerBackPic then
     trainer = true
+    pic = battle.playerBackPic
   end
-  return { canvas = canvas, ax = ax, ay = ay, trainer = trainer }
+  return { canvas = canvas, ax = ax, ay = ay, trainer = trainer,
+           key = pic and (side .. "#" .. tostring(pic)) or nil }
 end
 
 -- Whether the hit flash is showing this frame.

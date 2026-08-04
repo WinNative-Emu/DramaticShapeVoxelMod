@@ -40,6 +40,8 @@ local TerrainAtlas = V.require("TerrainAtlas")
 local VoxelScene = V.require("VoxelScene")
 local BattleCam = V.require("BattleCam")
 local BattleBillboard = V.require("BattleBillboard")
+local MonRelief = V.require("MonRelief")
+local Voxel = V.require("VoxelState")
 local VoxelGrid = V.require("VoxelGrid")
 local DayNight = V.require("DayNight")
 local PaletteFX = require("src.render.PaletteFX")
@@ -183,7 +185,7 @@ local function monMatrix(tex, x, groundY, z, mirror)
   local ox = -((tex.ax / BattleScene.GB_W) - 0.5) * w
   local oy = -((BattleScene.GB_H - tex.ay) / BattleScene.GB_H) * h
   local yaw = BattleBillboard.yawToward(x, z, Voxel3D.eye)
-  local card = Mat4.mul(Mat4.translate(ox, oy, 0), Mat4.scale(w, h, 1))
+  local card = Mat4.mul(Mat4.translate(ox, oy, 0), Mat4.scale(w, h, w))
   if mirror then card = Mat4.mul(Mat4.scale(-1, 1, 1), card) end
   return Mat4.mul(Mat4.mul(Mat4.translate(x, groundY, z), Mat4.rotateY(yaw)),
                   card)
@@ -198,7 +200,11 @@ local function monCards(arena, groundY, textures)
     local cell = (side == "player") and arena.player or arena.enemy
     if tex and tex.canvas and cell then
       local mirror = (side == "player") and not tex.trainer
-      out[#out + 1] = { tex = tex.canvas,
+      local mesh = nil
+      if Voxel.trueActors() and tex.key then
+        mesh = MonRelief.mesh(tex.canvas, tex.key)
+      end
+      out[#out + 1] = { tex = tex.canvas, mesh = mesh,
                         model = monMatrix(tex, cell[1], groundY, cell[2],
                                           mirror) }
     end
@@ -218,6 +224,7 @@ local function shadowSignature(state, arena, terrain, nbMesh, token)
   local host = arena.map or state.map
   local parts = { "battle", host.id, arena.x, arena.y, arena.shape,
                   tostring(terrain), tostring(token or 0),
+                  Voxel.trueActors() and 1 or 0,
                   -- the cycle keeps running through a fight, and an arena lit
                   -- from somewhere new must be re-cast from there
                   math.floor(ShadowMap.KX * 128),
@@ -250,8 +257,12 @@ local function castShadows(state, arena, terrain, nbMesh, cx, cy, vw, vh,
   -- is the silhouette, so what lands on the ground is the shape of the
   -- Pokemon rather than a blob standing in for one.
   for _, card in ipairs(cards or {}) do
-    ShadowMap.draw(BattleBillboard.mesh(), card.tex,
-                   ShadowMap.snug(card.model))
+    if card.mesh then
+      ShadowMap.draw(card.mesh, card.tex, card.model)
+    else
+      ShadowMap.draw(BattleBillboard.mesh(), card.tex,
+                     ShadowMap.snug(card.model))
+    end
   end
 
   ShadowMap.finish(sig)
@@ -418,8 +429,13 @@ function BattleScene.render(state, arena, textures, token)
     for _, card in ipairs(monCards(arena, groundY, textures)) do
       -- the sun stored this card snugged (castShadows), so its own shadow
       -- lookup must read the same snugged transform -- see ShadowMap.snug
-      Voxel3D.draw(BattleBillboard.mesh(), card.tex, card.model,
-                   BattleBillboard.PULL, ShadowMap.snug(card.model))
+      if card.mesh then
+        Voxel3D.draw(card.mesh, card.tex, card.model, BattleBillboard.PULL,
+                     card.model)
+      else
+        Voxel3D.draw(BattleBillboard.mesh(), card.tex, card.model,
+                     BattleBillboard.PULL, ShadowMap.snug(card.model))
+      end
     end
     Voxel3D.glass(true)
     Voxel3D.seams(true)

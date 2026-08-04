@@ -32,15 +32,28 @@ local Voxel = {}
 -- Its ANGLE is 35 degrees, the same as the rung of that name. The duplicate
 -- in the table is deliberate: the ladder is a list of what each rung LOOKS
 -- like, and two rungs may look the same while meaning different things.
-Voxel.ANGLES_DEG = { 0, 35, 15, 35, 50, 75 }
-Voxel.ANGLE_LABELS = { "OFF", "FULL", "15", "35", "50", "75" }
+Voxel.ANGLES_DEG = { 0, 35, 35, 15, 35, 50, 75 }
+Voxel.ANGLE_LABELS = { "OFF", "FULL", "3D", "15", "35", "50", "75" }
 Voxel.MAX_LEVEL = #Voxel.ANGLES_DEG - 1
 
--- the rung FULL sits on, so nothing has to hunt for it by label
 Voxel.FULL_LEVEL = 1
+Voxel.TRUE3D_LEVEL = 2
 
 function Voxel.isFull(level)
   return (level or Voxel.level) == Voxel.FULL_LEVEL
+end
+
+function Voxel.isTrue3D(level)
+  return (level or Voxel.level) == Voxel.TRUE3D_LEVEL
+end
+
+function Voxel.isPreset(level)
+  local l = level or Voxel.level
+  return l == Voxel.FULL_LEVEL or l == Voxel.TRUE3D_LEVEL
+end
+
+function Voxel.trueActors()
+  return Voxel.level == Voxel.TRUE3D_LEVEL
 end
 
 -- ------- what the hotkey walks
@@ -51,7 +64,7 @@ end
 -- mid-walk, would silently turn the blur to maximum and flatten the horizon
 -- with no indication that a keypress had done so. FULL stays on the OPTIONS
 -- row, which is where a preset that changes other rows belongs.
-Voxel.HOTKEY_ORDER = { 0, 2, 3, 4, 5 }   -- OFF, 15, 35, 50, 75
+Voxel.HOTKEY_ORDER = { 0, 3, 4, 5, 6 }   -- OFF, 15, 35, 50, 75
 
 -- The rung a press moves to from `level`.
 --

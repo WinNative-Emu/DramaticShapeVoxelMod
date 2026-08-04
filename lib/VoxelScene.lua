@@ -17,6 +17,7 @@ local Voxel3D = V.require("Voxel3D")
 local ShadowMap = V.require("ShadowMap")
 local ChunkMesher = V.require("ChunkMesher")
 local SpriteBillboards = V.require("SpriteBillboards")
+local ActorHull = V.require("ActorHull")
 local TileShape = V.require("TileShape")
 local TerrainAtlas = V.require("TerrainAtlas")
 local Voxel = V.require("VoxelState")
@@ -247,6 +248,25 @@ local function billboardPull()
   return VoxelScene.pull(math.max(Voxel.angle, 0.05))
 end
 
+local function hullMatrix(px, py, y, facing, mirror)
+  local m = Mat4.mul(Mat4.translate(px + 8, y, py + 8),
+                     Mat4.rotateY(YAW[facing] or 0))
+  if mirror then m = Mat4.mul(m, Mat4.scale(-1, 1, 1)) end
+  return Mat4.mul(m, Mat4.translate(-8, 0, -8))
+end
+
+local function hullFor(def, facing, phase, flip)
+  local Voxel = V.require("VoxelState")
+  if not Voxel.trueActors() then return nil end
+  local frame, mirror = frameFor(def, facing, phase, flip)
+  local mesh = ActorHull.mesh(def, frame)
+  if not mesh then return nil end
+  return mesh, (facing ~= "right") and mirror or false
+end
+
+VoxelScene.hullMatrix = hullMatrix
+VoxelScene.hullFor = hullFor
+
 -- An authored FIGURE's card -- a person the tileset draws INTO a piece of
 -- furniture, cut out by the profile's mask (Structures.buildFigures). It is
 -- a sprite, so it gets the sprite treatment: the mesh arrives in its own
@@ -299,6 +319,13 @@ local function drawEntity(sprite, px, py, facing, phase, flip, gh, colors,
   -- LEANS BACK, pivoting at its feet, by exactly the camera's pitch, so
   -- at every tilt level the sprite reads face-on like the flat game.
   -- No camera-tracking yaw: every sprite leans in parallel.
+  local hull, hullMirror = hullFor(def, facing, phase, flip)
+  if hull then
+    local m = hullMatrix(px, py, y, facing, hullMirror)
+    Voxel3D.draw(hull, tex, m, billboardPull(), m)
+    return true
+  end
+
   local frame, mirror = frameFor(def, facing, phase, flip)
   local mesh = SpriteBillboards.mesh(def, frame)
   if not mesh then return false end
@@ -511,6 +538,7 @@ local function shadowSignature(terrain, nbMesh, posed, cx, cy, vw, vh)
   -- standing perfectly still
   put(vw); put(vh)
   put(math.floor((V.require("VoxelState").angle or 0) * 512))
+  put(V.require("VoxelState").trueActors() and 1 or 0)
   -- the sun itself: the cycle swings the shear as the clock runs, and a map
   -- lit from somewhere new must be redrawn from there too. Quantised by the
   -- rig's own step (DayNight.rigTime), so a running cycle redraws the map a
@@ -575,13 +603,20 @@ local function castShadows(state, terrain, nbMesh, posed, cx, cy, vw, vh,
   end
   for _, p in ipairs(posed) do
     local def = p.sprite.def
-    local frame, mirror = frameFor(def, p.facing, p.phase, p.flip)
-    local mesh = SpriteBillboards.shadowQuad(def, frame)
-    if mesh then
-      ShadowMap.draw(mesh, p.sprite:resolveImage(),
-                     ShadowMap.snug(
-                       Voxel3D.casterMatrix(p.px, p.py, p.gh + (p.lift or 0),
-                                            mirror)))
+    local hull, hullMirror = hullFor(def, p.facing, p.phase, p.flip)
+    if hull then
+      ShadowMap.draw(hull, p.sprite:resolveImage(),
+                     hullMatrix(p.px, p.py, p.gh + (p.lift or 0), p.facing,
+                                hullMirror))
+    else
+      local frame, mirror = frameFor(def, p.facing, p.phase, p.flip)
+      local mesh = SpriteBillboards.shadowQuad(def, frame)
+      if mesh then
+        ShadowMap.draw(mesh, p.sprite:resolveImage(),
+                       ShadowMap.snug(
+                         Voxel3D.casterMatrix(p.px, p.py, p.gh + (p.lift or 0),
+                                              mirror)))
+      end
     end
   end
 
