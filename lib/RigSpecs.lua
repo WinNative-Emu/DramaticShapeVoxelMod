@@ -312,16 +312,11 @@ local function runPrim(g, n, F, K, list)
                 op[5] * F.s, F.Y(op[6]), op[7] * F.s,
                 op[8] * F.s, op[9] * F.s)
     elseif kind == "b" then
-      K.ellipsoid(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
-                  op[5] * F.s, op[6] * F.s, op[7] * F.s)
-      K.capsule(K.tmp, n, op[2] * F.s, F.Y(op[3] + op[6] / F.s * 0),
-                op[4] * F.s, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
-                op[5] * F.s, op[5] * F.s)
-      dst = first and g or K.tmp
+      K.box(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
+            op[5] * F.s, op[6] * F.s, op[7] * F.s, (op[8] or 0.25) * F.s)
     elseif kind == "t" then
-      K.capsule(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s - op[5] * F.s,
-                op[2] * F.s, F.Y(op[3]), op[4] * F.s + op[5] * F.s,
-                op[6] * F.s, op[6] * F.s)
+      K.torus(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
+              op[5] * F.s, op[6] * F.s)
     elseif kind == "yb" then
       K.clipBelow(g, K.cells, n, F.Y(op[2]))
       dst = nil

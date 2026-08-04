@@ -106,6 +106,48 @@ local function fillCapsule(g, n, ax, ay, az, bx, by, bz, r0, r1)
   end
 end
 
+local function fillBox(g, n, cx, cy, cz, hx, hy, hz, r)
+  local half = n / 2
+  local i = 0
+  for z = 0, n do
+    local dz = abs(z + 0.5 - half - cz) - hz
+    local oz = (dz > 0) and dz or 0
+    for y = 0, n do
+      local dy = abs(y + 0.5 - cy) - hy
+      local oy = (dy > 0) and dy or 0
+      local myz = (dy > dz) and dy or dz
+      for x = 0, n do
+        local dx = abs(x + 0.5 - half - cx) - hx
+        local ox = (dx > 0) and dx or 0
+        local m = (dx > myz) and dx or myz
+        if m > 0 then m = 0 end
+        i = i + 1
+        g[i] = r - sqrt(ox * ox + oy * oy + oz * oz) - m
+      end
+    end
+    Budget.tick()
+  end
+end
+
+local function fillTorus(g, n, cx, cy, cz, rad, tube)
+  local half = n / 2
+  local i = 0
+  for z = 0, n do
+    local qz = z + 0.5 - half - cz
+    for y = 0, n do
+      local qy = y + 0.5 - cy
+      local rr = sqrt(qy * qy + qz * qz) - rad
+      local rr2 = rr * rr
+      for x = 0, n do
+        local qx = x + 0.5 - half - cx
+        i = i + 1
+        g[i] = tube - sqrt(rr2 + qx * qx)
+      end
+    end
+    Budget.tick()
+  end
+end
+
 local function clipBelow(g, cells, n, yv)
   local i = 0
   for z = 0, n do
@@ -416,6 +458,8 @@ local K = {
   capsule = fillCapsule,
   clipBelow = clipBelow,
   clipFrontOf = clipFrontOf,
+  box = fillBox,
+  torus = fillTorus,
   subtract = subtractInto,
   union = unionInto,
 }
