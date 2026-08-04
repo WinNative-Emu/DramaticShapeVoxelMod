@@ -9,10 +9,14 @@ TRUE 3D actors are now authored geometry rather than a carved silhouette.
   normals from the field gradient and assigns a colour per vertex.
 - `lib/RigSpecs.lua` turns a declarative spec into that part list and evaluates
   the surface decals -- eyes, brows, mouth, glasses, beard, garment bands.
-- `lib/RigCast.lua` carries the specs: Red, Blue, Oak, the nurse, the mart
-  clerk, the youngster, the lass, gramps, a Rocket grunt, Lance, Giovanni, the
-  scientist, the beauty, the hiker, the sailor, the biker, the gentleman, Koga
-  and Agatha, plus aliases for sprites that reuse those looks.
+- `lib/RigCast.lua` carries a spec for every humanoid overworld sprite -- 54 of
+  the 67 sheets once aliases are counted. The thirteen that are not people
+  (the bird, the boulder, the fossil, the paper, the clipboard, the Pokedex,
+  the poke ball, old amber, the fairy, the monster, Seel, Snorlax and the bike)
+  keep the carved hull, which is the right answer for them.
+- Eye geometry is scaled centrally now that the decals are painted at texel
+  rather than vertex resolution. Sizes carried over from the offline prototype
+  read about a quarter too large once they are actually sharp.
 - The head carries a real UV unwrap. Every head vertex takes an
   equirectangular coordinate (longitude about the model's own axis, latitude
   from its height) into a 96x96 face patch, and the eyes, brows, mouth,

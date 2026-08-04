@@ -11,8 +11,48 @@ local WHITE = { 0.945, 0.950, 0.960 }
 
 local M = {}
 
+local EYE_BASE = {
+  kid = { sep = 0.330, cy = -0.498, rw = 0.250, rh = 0.290 },
+  teen = { sep = 0.322, cy = -0.492, rw = 0.252, rh = 0.288 },
+  adult = { sep = 0.320, cy = -0.478, rw = 0.238, rh = 0.232 },
+  bulk = { sep = 0.324, cy = -0.478, rw = 0.234, rh = 0.220 },
+}
+
+local function scaleEye(e, frame)
+  e = e or {}
+  local b = EYE_BASE[frame or "adult"]
+  e.sep = e.sep or b.sep
+  local rw0 = e.rw or b.rw
+  local rh0 = e.rh or b.rh
+  local cy0 = e.cy or b.cy
+  local rw = rw0 * 0.786
+  local rh = rh0 * 0.758
+  local cy = cy0 + 0.49 * (rh0 - rh)
+  e.irisW = (e.irisW or rw0 * 0.72) * 0.769
+  e.irisH = (e.irisH or rh0 * 0.76) * 0.748
+  e.lidW = (e.lidW or rw0 * 1.07) * 0.790
+  e.lidH = (e.lidH or rh0 * 0.27) * 0.740
+  e.hiDx = (e.hiDx or rw0 * 0.29) * 0.780
+  e.hiW = (e.hiW or rw0 * 0.28) * 0.780
+  e.hiH = (e.hiH or rh0 * 0.27) * 0.760
+  e.rw, e.rh, e.cy = rw, rh, cy
+  e.irisCy = cy - rh * 0.10
+  e.lidCy = cy + rh * 0.92
+  e.hiCy = cy + rh * 0.26
+  e.iris = e.iris or { 0.104, 0.094, 0.100 }
+  return e
+end
+
 local function finish(key, spec)
   local p = spec.palette
+  spec.eye = scaleEye(spec.eye, spec.frame)
+  spec.mouth = spec.mouth or { cy = -0.756, w = 0.140, h = 0.036, k = 0.40 }
+  spec.hair = spec.hair or {}
+  p.hair = p.hair or { 0.188, 0.140, 0.116 }
+  p.hairHi = p.hairHi or { 0.312, 0.242, 0.196 }
+  p.hairSh = p.hairSh or { 0.108, 0.076, 0.062 }
+  p.skin = p.skin or SKIN
+  p.mouth = p.mouth or { 0.520, 0.230, 0.230 }
   p.skinSh = p.skinSh or SKIN_SH
   p.head = p.skin
   p.hand = p.skin
@@ -51,10 +91,7 @@ finish("red", {
               bottomSh = { 0.196, 0.256, 0.402 },
               shoe = { 0.760, 0.215, 0.170 },
               mouth = { 0.520, 0.230, 0.230 } },
-  eye = { sep = 0.318, cy = -0.470, rw = 0.198, rh = 0.226,
-          irisW = 0.140, irisH = 0.166, irisCy = -0.492,
-          lidW = 0.212, lidH = 0.058, lidCy = -0.262,
-          hiDx = 0.058, hiW = 0.056, hiH = 0.062, hiCy = -0.412,
+  eye = { sep = 0.330, cy = -0.505, rw = 0.252, rh = 0.298,
           iris = { 0.070, 0.075, 0.105 } },
   mouth = { cy = -0.775, w = 0.130, h = 0.044, k = 0.42 },
 })
@@ -683,10 +720,531 @@ finish("agatha", {
   mouth = { cy = -0.748, w = 0.116, h = 0.030, k = 0.30 },
 })
 
+local function W(x, o, c, cut)
+  return { winX = x, winOff = o, winCy = c, cut = cut or -0.50,
+           locks = { { -0.44, 0.30, 0.26 }, { 0.02, 0.36, 0.22 },
+                     { 0.42, 0.28, 0.26 } } }
+end
+
+local function LONG(x, o, c, cut, dw, dy, dz, dr)
+  local h = W(x, o, c, cut)
+  h.drape = { dw, dy, dz, dr }
+  return h
+end
+
+local function BALD(x, o, c)
+  return { winX = x, winOff = o, winCy = c, winRy = 0.96, cut = -0.52,
+           grow = 1.072,
+           strands = { { -0.92, 0.15, -0.10, -0.86, -0.50, 0.02, 0.18, 0.11 },
+                       { 0.92, 0.15, -0.10, 0.86, -0.50, 0.02, 0.18, 0.11 } } }
+end
+
+local BROWN = { 0.286, 0.196, 0.126 }
+local BROWN_HI = { 0.432, 0.318, 0.212 }
+local BROWN_SH = { 0.176, 0.114, 0.072 }
+local BLACKH = { 0.168, 0.160, 0.180 }
+local BLACKH_HI = { 0.288, 0.278, 0.316 }
+local BLACKH_SH = { 0.098, 0.092, 0.110 }
+local GREY = { 0.848, 0.852, 0.864 }
+local GREY_HI = { 0.938, 0.940, 0.950 }
+local GREY_SH = { 0.658, 0.664, 0.682 }
+
+local function pal(t)
+  t.hairHi = t.hairHi or (t.hair == BROWN and BROWN_HI)
+                      or (t.hair == BLACKH and BLACKH_HI)
+                      or (t.hair == GREY and GREY_HI)
+  t.hairSh = t.hairSh or (t.hair == BROWN and BROWN_SH)
+                      or (t.hair == BLACKH and BLACKH_SH)
+                      or (t.hair == GREY and GREY_SH)
+  return t
+end
+
+finish("balding_guy", {
+  frame = "adult", hair = BALD(0.60, 0.30, 0.16),
+  fit = { collarW = 0.78, collarH = 0.95, chest = 1.04, depth = 1.06 },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  top = { 0.322, 0.482, 0.406 },
+                  topHi = { 0.436, 0.598, 0.520 },
+                  collar = { 0.918, 0.924, 0.938 },
+                  bottom = { 0.352, 0.322, 0.286 },
+                  bottomSh = { 0.268, 0.244, 0.212 },
+                  shoe = { 0.212, 0.176, 0.146 } }),
+  eye = { brow = GREY_SH, browCy = -0.128 },
+})
+
+finish("bike_shop_clerk", {
+  frame = "adult", hair = W(0.54, 0.27, -0.26),
+  fit = { collarW = 0.80, collarH = 1.08,
+          bands = { { 0.34, 0.62, "accent", 0.80 } } },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.892, 0.462, 0.196 },
+                  topHi = { 0.962, 0.598, 0.312 },
+                  collar = { 0.928, 0.932, 0.944 },
+                  accent = { 0.928, 0.932, 0.944 },
+                  bottom = { 0.226, 0.256, 0.352 },
+                  bottomSh = { 0.162, 0.186, 0.262 },
+                  shoe = { 0.148, 0.142, 0.166 } }),
+})
+
+finish("bruno", {
+  frame = "bulk", hair = W(0.55, 0.27, -0.24),
+  fit = { chest = 1.10, depth = 1.10, collarW = 0.86, collarH = 0.60,
+          shoeLen = 2.05, shoeR = 1.00 },
+  palette = pal({ skin = DARK, skinSh = DARK_SH, hair = BLACKH,
+                  top = DARK, topHi = { 0.792, 0.586, 0.428 },
+                  sleeve = DARK, collar = DARK,
+                  bottom = { 0.936, 0.940, 0.952 },
+                  bottomSh = { 0.792, 0.798, 0.818 },
+                  shoe = { 0.402, 0.286, 0.196 } }),
+  eye = { brow = BLACKH_SH, browCy = -0.146 },
+})
+
+finish("captain", {
+  frame = "adult", hair = W(0.54, 0.27, -0.24),
+  hat = { kind = "beanie", brim = 2.90, grow = 1.115 },
+  fit = { collarW = 0.86, collarH = 1.18, chest = 1.04,
+          bands = { { 0.08, 0.30, "accent", 0.70 } } },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  hat = { 0.936, 0.940, 0.954 },
+                  hatSh = { 0.176, 0.212, 0.336 },
+                  top = { 0.936, 0.940, 0.954 },
+                  topHi = { 0.988, 0.990, 0.996 },
+                  collar = { 0.176, 0.212, 0.336 },
+                  accent = { 0.176, 0.212, 0.336 },
+                  cuff = { 0.176, 0.212, 0.336 },
+                  bottom = { 0.176, 0.212, 0.336 },
+                  bottomSh = { 0.126, 0.152, 0.246 },
+                  shoe = { 0.108, 0.102, 0.126 } }),
+  eye = { brow = GREY_SH, browCy = -0.130 },
+})
+
+finish("channeler", {
+  frame = "adult", hair = LONG(0.52, 0.26, -0.30, -0.34, 1.04, -0.34, 0.20, 1.12),
+  fit = { bottom = "dress", hem = 14.30, skirtR0 = 0.94, skirtR1 = 1.28,
+          collarW = 0.76, shoeLen = 1.70, chest = 0.94 },
+  palette = pal({ skin = { 0.958, 0.842, 0.786 },
+                  skinSh = { 0.872, 0.732, 0.678 }, hair = BLACKH,
+                  top = { 0.876, 0.312, 0.376 },
+                  topHi = { 0.948, 0.436, 0.492 },
+                  collar = { 0.936, 0.940, 0.952 },
+                  coat = { 0.876, 0.312, 0.376 },
+                  coatSh = { 0.716, 0.216, 0.286 },
+                  bottom = { 0.876, 0.312, 0.376 },
+                  shoe = { 0.286, 0.196, 0.246 } }),
+  eye = { lash = 0.70, iris = { 0.216, 0.126, 0.156 } },
+})
+
+finish("cook", {
+  frame = "bulk", hair = W(0.55, 0.27, -0.22),
+  hat = { kind = "beanie", brim = 2.20, grow = 1.15 },
+  fit = { chest = 1.08, depth = 1.08, collarW = 0.86, collarH = 1.10 },
+  palette = pal({ skin = SKIN, hair = BLACKH,
+                  hat = { 0.958, 0.962, 0.972 },
+                  hatSh = { 0.812, 0.818, 0.836 },
+                  top = { 0.948, 0.952, 0.964 },
+                  topHi = { 0.996, 0.997, 1.0 },
+                  collar = { 0.896, 0.902, 0.918 },
+                  bottom = { 0.352, 0.356, 0.396 },
+                  bottomSh = { 0.268, 0.272, 0.308 },
+                  shoe = { 0.148, 0.142, 0.166 } }),
+})
+
+finish("cooltrainer_f", {
+  frame = "adult", hair = LONG(0.54, 0.27, -0.30, -0.36, 1.02, -0.32, 0.20, 1.08),
+  fit = { bottom = "skirt", hem = 13.90, skirtR0 = 0.92, skirtR1 = 1.34,
+          collarW = 0.76, shoeLen = 1.75, chest = 0.95,
+          bands = { { 0.62, 0.84, "accent", 0.80 } } },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.226, 0.486, 0.632 },
+                  topHi = { 0.348, 0.612, 0.748 },
+                  collar = { 0.946, 0.950, 0.960 },
+                  accent = { 0.946, 0.950, 0.960 },
+                  coat = { 0.196, 0.226, 0.316 },
+                  coatSh = { 0.136, 0.158, 0.226 },
+                  bottom = SKIN,
+                  shoe = { 0.836, 0.256, 0.286 } }),
+  eye = { lash = 0.85, iris = { 0.156, 0.212, 0.312 } },
+})
+
+finish("daisy", {
+  frame = "adult", hair = LONG(0.54, 0.27, -0.30, -0.34, 1.04, -0.36, 0.20, 1.12),
+  fit = { bottom = "dress", hem = 14.10, skirtR0 = 0.92, skirtR1 = 1.32,
+          collarW = 0.76, shoeLen = 1.72, chest = 0.94 },
+  palette = pal({ skin = SKIN, hair = { 0.836, 0.652, 0.312 },
+                  hairHi = { 0.942, 0.802, 0.482 },
+                  hairSh = { 0.662, 0.482, 0.196 },
+                  top = { 0.936, 0.482, 0.552 },
+                  topHi = { 0.982, 0.610, 0.662 },
+                  collar = { 0.962, 0.966, 0.976 },
+                  coat = { 0.936, 0.482, 0.552 },
+                  coatSh = { 0.788, 0.362, 0.436 },
+                  bottom = SKIN,
+                  shoe = { 0.882, 0.316, 0.352 } }),
+  eye = { lash = 0.85, iris = { 0.196, 0.132, 0.092 } },
+  blush = 0.28,
+})
+
+finish("fisher", {
+  frame = "bulk", hair = W(0.55, 0.27, -0.22),
+  fit = { chest = 1.06, depth = 1.06, collarW = 0.84, collarH = 1.00,
+          shoeLen = 2.10, shoeR = 1.02,
+          bands = { { 0.36, 0.52, "accent", 0.85 },
+                    { 0.66, 0.82, "accent", 0.85 } } },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = BROWN,
+                  beard = BROWN_SH,
+                  top = { 0.936, 0.940, 0.952 },
+                  topHi = { 0.990, 0.992, 0.998 },
+                  collar = { 0.196, 0.256, 0.412 },
+                  accent = { 0.196, 0.256, 0.412 },
+                  bottom = { 0.286, 0.322, 0.406 },
+                  bottomSh = { 0.206, 0.236, 0.302 },
+                  shoe = { 0.226, 0.186, 0.146 } }),
+  beard = true,
+})
+
+finish("fishing_guru", {
+  frame = "bulk", hair = BALD(0.60, 0.30, 0.18),
+  fit = { chest = 1.08, depth = 1.10, collarW = 0.84, collarH = 0.95 },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  beard = { 0.878, 0.882, 0.892 },
+                  top = { 0.836, 0.436, 0.216 },
+                  topHi = { 0.928, 0.572, 0.336 },
+                  collar = { 0.918, 0.922, 0.936 },
+                  bottom = { 0.302, 0.336, 0.286 },
+                  bottomSh = { 0.226, 0.252, 0.212 },
+                  shoe = { 0.226, 0.176, 0.136 } }),
+  eye = { brow = GREY_SH, browCy = -0.128 },
+  beard = true,
+})
+
+finish("gambler", {
+  frame = "adult", hair = W(0.54, 0.27, -0.24),
+  fit = { collarW = 0.82, collarH = 1.20, chest = 1.03,
+          bands = { { 0.06, 0.28, "accent", 0.55 } } },
+  palette = pal({ skin = SKIN, hair = BLACKH,
+                  top = { 0.246, 0.212, 0.302 },
+                  topHi = { 0.356, 0.316, 0.426 },
+                  collar = { 0.946, 0.950, 0.962 },
+                  accent = { 0.812, 0.652, 0.216 },
+                  cuff = { 0.946, 0.950, 0.962 },
+                  bottom = { 0.226, 0.196, 0.276 },
+                  bottomSh = { 0.162, 0.140, 0.202 },
+                  shoe = { 0.116, 0.106, 0.132 } }),
+  eye = { brow = BLACKH_SH, browCy = -0.142 },
+})
+
+finish("gameboy_kid", {
+  frame = "kid", hair = W(0.55, 0.27, -0.30, -0.48),
+  fit = { shoeLen = 1.90,
+          bands = { { 0.40, 0.70, "accent", 0.80 } } },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.892, 0.352, 0.286 },
+                  topHi = { 0.958, 0.482, 0.396 },
+                  collar = { 0.946, 0.950, 0.960 },
+                  accent = { 0.946, 0.950, 0.960 },
+                  bottom = { 0.256, 0.316, 0.462 },
+                  bottomSh = { 0.186, 0.232, 0.352 },
+                  shoe = { 0.236, 0.240, 0.286 } }),
+  blush = 0.24,
+})
+
+finish("granny", {
+  frame = "adult", hair = W(0.56, 0.28, -0.18, -0.42),
+  fit = { bottom = "dress", hem = 14.40, skirtR0 = 0.94, skirtR1 = 1.26,
+          collarW = 0.76, shoeLen = 1.70, chest = 0.98 },
+  palette = pal({ skin = { 0.912, 0.782, 0.686 },
+                  skinSh = { 0.816, 0.668, 0.566 }, hair = GREY,
+                  top = { 0.616, 0.482, 0.586 },
+                  topHi = { 0.736, 0.606, 0.702 },
+                  collar = { 0.936, 0.940, 0.952 },
+                  coat = { 0.606, 0.472, 0.576 },
+                  coatSh = { 0.462, 0.346, 0.436 },
+                  bottom = { 0.512, 0.396, 0.486 },
+                  shoe = { 0.246, 0.196, 0.236 } }),
+  eye = { brow = GREY_SH, browCy = -0.126, lash = 0.45 },
+})
+
+finish("guard", {
+  frame = "bulk", hair = W(0.54, 0.27, -0.22),
+  hat = { kind = "cap", brim = 3.60, grow = 1.10, fwd = 0.74 },
+  fit = { chest = 1.05, collarW = 0.86, collarH = 1.15, shoeLen = 2.05,
+          shoeR = 0.98, bands = { { 0.08, 0.32, "accent", 0.60 } } },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = BLACKH,
+                  hat = { 0.176, 0.226, 0.336 },
+                  hatSh = { 0.116, 0.152, 0.236 },
+                  top = { 0.196, 0.246, 0.362 },
+                  topHi = { 0.296, 0.356, 0.482 },
+                  collar = { 0.916, 0.922, 0.936 },
+                  accent = { 0.812, 0.702, 0.286 },
+                  cuff = { 0.812, 0.702, 0.286 },
+                  bottom = { 0.176, 0.222, 0.326 },
+                  bottomSh = { 0.126, 0.160, 0.240 },
+                  shoe = { 0.096, 0.092, 0.112 } }),
+  eye = { brow = BLACKH_SH, browCy = -0.144 },
+})
+
+finish("gym_guide", {
+  frame = "adult", hair = BALD(0.60, 0.30, 0.14),
+  fit = { collarW = 0.80, collarH = 1.00, chest = 1.04,
+          bands = { { 0.32, 0.64, "accent", 0.70 } } },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  top = { 0.286, 0.596, 0.362 },
+                  topHi = { 0.412, 0.712, 0.482 },
+                  collar = { 0.926, 0.930, 0.942 },
+                  accent = { 0.926, 0.930, 0.942 },
+                  bottom = { 0.352, 0.322, 0.276 },
+                  bottomSh = { 0.266, 0.242, 0.206 },
+                  shoe = { 0.216, 0.176, 0.140 } }),
+  eye = { brow = GREY_SH, browCy = -0.128 },
+})
+
+finish("little_boy", {
+  frame = "kid", hair = W(0.55, 0.27, -0.30, -0.46),
+  fit = { shoeLen = 1.85,
+          bands = { { 0.44, 0.72, "accent", 0.75 } } },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.396, 0.686, 0.856 },
+                  topHi = { 0.522, 0.786, 0.928 },
+                  collar = { 0.946, 0.950, 0.960 },
+                  accent = { 0.946, 0.950, 0.960 },
+                  bottom = { 0.836, 0.616, 0.286 },
+                  bottomSh = { 0.686, 0.492, 0.216 },
+                  shoe = { 0.236, 0.240, 0.286 } }),
+  blush = 0.30,
+})
+
+finish("lorelei", {
+  frame = "adult", hair = LONG(0.52, 0.26, -0.30, -0.32, 1.06, -0.40, 0.20, 1.16),
+  fit = { bottom = "dress", hem = 14.05, skirtR0 = 0.92, skirtR1 = 1.34,
+          collarW = 0.76, shoeLen = 1.72, chest = 0.94 },
+  palette = pal({ skin = { 0.972, 0.856, 0.792 },
+                  skinSh = { 0.882, 0.746, 0.686 },
+                  hair = { 0.286, 0.226, 0.352 },
+                  hairHi = { 0.412, 0.342, 0.492 },
+                  hairSh = { 0.186, 0.142, 0.236 },
+                  top = { 0.876, 0.286, 0.336 },
+                  topHi = { 0.948, 0.412, 0.452 },
+                  collar = { 0.946, 0.950, 0.962 },
+                  coat = { 0.866, 0.276, 0.326 },
+                  coatSh = { 0.712, 0.186, 0.246 },
+                  bottom = { 0.826, 0.246, 0.296 },
+                  shoe = { 0.256, 0.216, 0.312 },
+                  glass = { 0.216, 0.226, 0.266 } }),
+  eye = { lash = 0.80, iris = { 0.176, 0.246, 0.362 } },
+  glasses = true,
+})
+
+finish("middle_aged_man", {
+  frame = "adult", hair = W(0.56, 0.28, -0.16, -0.50),
+  fit = { collarW = 0.80, collarH = 1.05, chest = 1.04, depth = 1.05 },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = BROWN,
+                  top = { 0.386, 0.436, 0.556 },
+                  topHi = { 0.502, 0.552, 0.662 },
+                  collar = { 0.926, 0.930, 0.942 },
+                  bottom = { 0.336, 0.312, 0.286 },
+                  bottomSh = { 0.256, 0.236, 0.216 },
+                  shoe = { 0.196, 0.166, 0.136 } }),
+  eye = { brow = BROWN_SH, browCy = -0.132 },
+})
+
+finish("middle_aged_woman", {
+  frame = "adult", hair = W(0.54, 0.27, -0.24, -0.40),
+  fit = { bottom = "dress", hem = 14.20, skirtR0 = 0.94, skirtR1 = 1.28,
+          collarW = 0.76, shoeLen = 1.70, chest = 0.96 },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.786, 0.526, 0.616 },
+                  topHi = { 0.882, 0.646, 0.716 },
+                  collar = { 0.946, 0.950, 0.960 },
+                  coat = { 0.776, 0.516, 0.606 },
+                  coatSh = { 0.626, 0.386, 0.472 },
+                  bottom = { 0.676, 0.436, 0.516 },
+                  shoe = { 0.256, 0.206, 0.216 } }),
+  eye = { lash = 0.60 },
+})
+
+finish("mom", {
+  frame = "adult", hair = LONG(0.54, 0.27, -0.28, -0.38, 1.00, -0.28, 0.20, 1.04),
+  fit = { bottom = "dress", hem = 14.15, skirtR0 = 0.94, skirtR1 = 1.30,
+          collarW = 0.76, shoeLen = 1.70, chest = 0.95 },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.876, 0.386, 0.396 },
+                  topHi = { 0.946, 0.512, 0.506 },
+                  collar = { 0.952, 0.956, 0.966 },
+                  coat = { 0.866, 0.376, 0.386 },
+                  coatSh = { 0.712, 0.276, 0.296 },
+                  bottom = SKIN,
+                  shoe = { 0.286, 0.206, 0.176 } }),
+  eye = { lash = 0.75, iris = { 0.196, 0.132, 0.092 } },
+  blush = 0.24,
+})
+
+finish("mr_fuji", {
+  frame = "adult", hair = BALD(0.60, 0.30, 0.20),
+  fit = { bottom = "coat", hem = 13.40, collarW = 0.84, collarH = 1.24,
+          chest = 1.02, shoeLen = 1.90 },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  beard = { 0.888, 0.892, 0.902 },
+                  top = { 0.586, 0.256, 0.216 },
+                  topHi = { 0.702, 0.362, 0.312 },
+                  sleeve = { 0.826, 0.782, 0.686 },
+                  cuff = { 0.702, 0.656, 0.562 },
+                  collar = { 0.836, 0.792, 0.696 },
+                  coat = { 0.826, 0.782, 0.686 },
+                  coatSh = { 0.672, 0.626, 0.532 },
+                  bottom = { 0.586, 0.552, 0.482 },
+                  bottomSh = { 0.462, 0.432, 0.372 },
+                  shoe = { 0.256, 0.216, 0.176 } }),
+  eye = { brow = GREY_SH, browCy = -0.126 },
+  beard = true,
+})
+
+finish("rocker", {
+  frame = "adult",
+  hair = { winX = 0.55, winOff = 0.27, winCy = -0.26, cut = -0.50,
+           locks = { { -0.44, 0.30, 0.25 }, { 0.42, 0.28, 0.25 } },
+           spikeR = 0.24, spikeT = 0.035,
+           spikes = { { 0.00, 0.52, 0.20, 0.02, 1.62, -0.20 },
+                      { -0.26, 0.50, 0.10, -0.36, 1.52, -0.36 },
+                      { 0.26, 0.50, 0.10, 0.36, 1.52, -0.36 },
+                      { -0.10, 0.44, -0.42, -0.14, 1.36, -0.86 } } },
+  fit = { collarW = 0.84, collarH = 1.05, chest = 1.02,
+          bands = { { 0.08, 0.30, "accent", 0.60 } } },
+  palette = pal({ skin = SKIN, hair = { 0.856, 0.286, 0.216 },
+                  hairHi = { 0.952, 0.436, 0.336 },
+                  hairSh = { 0.666, 0.176, 0.126 },
+                  top = { 0.186, 0.176, 0.206 },
+                  topHi = { 0.296, 0.286, 0.336 },
+                  collar = { 0.126, 0.120, 0.146 },
+                  accent = { 0.826, 0.716, 0.246 },
+                  cuff = { 0.826, 0.716, 0.246 },
+                  bottom = { 0.156, 0.150, 0.186 },
+                  bottomSh = { 0.106, 0.102, 0.132 },
+                  shoe = { 0.096, 0.092, 0.114 } }),
+})
+
+finish("safari_zone_worker", {
+  frame = "adult", hair = W(0.54, 0.27, -0.24),
+  hat = { kind = "cap", brim = 3.60, grow = 1.10, fwd = 0.76 },
+  fit = { collarW = 0.84, collarH = 1.05, chest = 1.03, shoeLen = 2.00,
+          bands = { { 0.08, 0.30, "accent", 0.60 } } },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = BROWN,
+                  hat = { 0.556, 0.596, 0.376 },
+                  hatSh = { 0.406, 0.442, 0.256 },
+                  top = { 0.596, 0.636, 0.406 },
+                  topHi = { 0.712, 0.746, 0.516 },
+                  collar = { 0.476, 0.512, 0.316 },
+                  accent = { 0.396, 0.336, 0.216 },
+                  bottom = { 0.516, 0.552, 0.346 },
+                  bottomSh = { 0.396, 0.426, 0.262 },
+                  shoe = { 0.256, 0.206, 0.146 } }),
+})
+
+finish("silph_president", {
+  frame = "adult", hair = BALD(0.60, 0.30, 0.16),
+  fit = { collarW = 0.80, collarH = 1.20, chest = 1.04, depth = 1.05,
+          bands = { { 0.06, 0.28, "accent", 0.50 } } },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  beard = { 0.878, 0.882, 0.892 },
+                  top = { 0.226, 0.222, 0.256 },
+                  topHi = { 0.336, 0.330, 0.376 },
+                  collar = { 0.946, 0.950, 0.962 },
+                  accent = { 0.586, 0.176, 0.196 },
+                  cuff = { 0.946, 0.950, 0.962 },
+                  bottom = { 0.212, 0.208, 0.242 },
+                  bottomSh = { 0.152, 0.148, 0.178 },
+                  shoe = { 0.106, 0.102, 0.122 } }),
+  eye = { brow = GREY_SH, browCy = -0.126 },
+  beard = true,
+})
+
+finish("silph_worker_f", {
+  frame = "adult", hair = LONG(0.54, 0.27, -0.28, -0.38, 1.00, -0.26, 0.20, 1.04),
+  fit = { bottom = "coat", hem = 12.70, collarW = 0.78, collarH = 1.10,
+          chest = 0.96, shoeLen = 1.78 },
+  palette = pal({ skin = SKIN, hair = BROWN,
+                  top = { 0.286, 0.436, 0.612 },
+                  topHi = { 0.398, 0.552, 0.722 },
+                  sleeve = { 0.918, 0.924, 0.940 },
+                  collar = { 0.926, 0.932, 0.948 },
+                  coat = { 0.918, 0.924, 0.940 },
+                  coatSh = { 0.766, 0.774, 0.802 },
+                  cuff = { 0.958, 0.962, 0.972 },
+                  bottom = { 0.322, 0.330, 0.382 },
+                  bottomSh = { 0.246, 0.252, 0.296 },
+                  shoe = { 0.152, 0.148, 0.172 } }),
+  eye = { lash = 0.75 },
+})
+
+finish("super_nerd", {
+  frame = "adult", hair = W(0.54, 0.27, -0.22, -0.46),
+  fit = { collarW = 0.80, collarH = 1.10, chest = 1.02,
+          bands = { { 0.06, 0.26, "accent", 0.60 } } },
+  palette = pal({ skin = { 0.968, 0.836, 0.732 },
+                  skinSh = { 0.876, 0.716, 0.616 }, hair = BLACKH,
+                  top = { 0.926, 0.930, 0.944 },
+                  topHi = { 0.986, 0.988, 0.994 },
+                  collar = { 0.876, 0.882, 0.902 },
+                  accent = { 0.556, 0.226, 0.256 },
+                  bottom = { 0.396, 0.372, 0.322 },
+                  bottomSh = { 0.302, 0.282, 0.242 },
+                  shoe = { 0.196, 0.176, 0.146 },
+                  glass = { 0.206, 0.216, 0.246 } }),
+  eye = { brow = BLACKH_SH, browCy = -0.140 },
+  glasses = true,
+})
+
+finish("swimmer", {
+  frame = "adult", hair = W(0.54, 0.27, -0.26),
+  fit = { collarW = 0.72, collarH = 0.50, chest = 0.98, shoeLen = 1.55,
+          shoeR = 0.72 },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = BROWN,
+                  top = TAN, topHi = { 0.968, 0.796, 0.632 },
+                  sleeve = TAN, collar = TAN,
+                  bottom = { 0.196, 0.436, 0.716 },
+                  bottomSh = { 0.146, 0.326, 0.552 },
+                  shoe = TAN, soleC = TAN_SH }),
+})
+
+finish("waiter", {
+  frame = "adult", hair = W(0.54, 0.27, -0.24),
+  fit = { collarW = 0.80, collarH = 1.22, chest = 1.02,
+          bands = { { 0.06, 0.30, "accent", 0.55 } } },
+  palette = pal({ skin = SKIN, hair = BLACKH,
+                  top = { 0.196, 0.192, 0.222 },
+                  topHi = { 0.302, 0.296, 0.342 },
+                  collar = { 0.952, 0.956, 0.966 },
+                  accent = { 0.586, 0.166, 0.186 },
+                  cuff = { 0.952, 0.956, 0.966 },
+                  bottom = { 0.176, 0.172, 0.202 },
+                  bottomSh = { 0.126, 0.122, 0.146 },
+                  shoe = { 0.096, 0.092, 0.112 } }),
+  eye = { brow = BLACKH_SH, browCy = -0.140 },
+})
+
+finish("warden", {
+  frame = "adult", hair = BALD(0.60, 0.30, 0.18),
+  fit = { collarW = 0.80, collarH = 1.00, chest = 1.04, depth = 1.06 },
+  palette = pal({ skin = TAN, skinSh = TAN_SH, hair = GREY,
+                  beard = { 0.882, 0.886, 0.896 },
+                  top = { 0.626, 0.522, 0.376 },
+                  topHi = { 0.742, 0.636, 0.482 },
+                  collar = { 0.912, 0.916, 0.928 },
+                  bottom = { 0.396, 0.362, 0.302 },
+                  bottomSh = { 0.302, 0.276, 0.226 },
+                  shoe = { 0.226, 0.186, 0.146 } }),
+  eye = { brow = GREY_SH, browCy = -0.128 },
+  beard = true,
+})
+
 M.brunette_girl = M.girl
 M.little_girl = M.girl
 M.cooltrainer_m = M.blue
 M.silph_worker_m = M.scientist
 M.link_receptionist = M.nurse
+
+M.unused_scientist = M.scientist
+M.unused_guard = M.guard
+M.gambler_asleep = M.gambler
+M.unused_gameboy_kid = M.gameboy_kid
 
 return M
