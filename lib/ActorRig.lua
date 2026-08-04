@@ -582,7 +582,7 @@ local function build(spec, n, pose)
 
   local function faceUV(i)
     local hx = vx[i] - half
-    local hz = vz[i] - half
+    local hz = vz[i] - half - (F.hcz or 0)
     local hv = (vy[i] - F.hcy) / F.hry
     if hv < -1 then hv = -1 elseif hv > 1 then hv = 1 end
     local lon = math.atan2(hx, hz)

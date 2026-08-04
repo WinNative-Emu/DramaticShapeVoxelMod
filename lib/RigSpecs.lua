@@ -42,6 +42,15 @@ function RigSpecs.frame(spec, n)
   F.armt = F.Y(d.armt)
   F.armb = F.Y(d.armb)
   F.tl = F.shY - F.hipY
+  F.hcz = 0
+  local h = spec.head
+  if h then
+    F.hcy = F.Y(h[1])
+    F.hrx = h[2] * s
+    F.hry = h[3] * s
+    F.hrz = h[4] * s
+    F.hcz = (h[5] or 0) * s
+  end
   return F
 end
 
@@ -392,7 +401,39 @@ local function ss(e0, e1, x)
 end
 
 function RigSpecs.faceTexel(spec, F, u, v, fz)
-  if spec.props then return { 0, 0, 0 } end
+  if spec.props then
+    local f = spec.face
+    if not f then return { 0.5, 0.5, 0.5 } end
+    local col = { f.base[1], f.base[2], f.base[3] }
+    if f.hi then col = mix(col, f.hi, ss(-0.10, 0.55, v) * 0.35) end
+    if fz > 0.12 then
+      local e = f.eyes
+      if e then
+        for sg = -1, 1, 2 do
+          local du = u - sg * e[1]
+          local d = sqrt((du / e[3]) ^ 2 + ((v - e[2]) / e[4]) ^ 2)
+          col = mix(col, e[5], ss(1.02, 0.78, d) * 0.98)
+          local hd = sqrt(((du + e[3] * 0.30) / (e[3] * 0.34)) ^ 2
+                          + ((v - e[2] - e[4] * 0.32) / (e[4] * 0.32)) ^ 2)
+          col = mix(col, e[6] or { 1, 1, 1 }, ss(1.05, 0.55, hd) * 0.95)
+        end
+      end
+      local m = f.mouth
+      if m then
+        local d = sqrt((u / m[2]) ^ 2 + ((v - m[1]) / m[3]) ^ 2)
+        col = mix(col, m[4], ss(1.05, 0.72, d) * (m[5] or 0.85))
+      end
+      local c = f.cheek
+      if c then
+        for sg = -1, 1, 2 do
+          local d = sqrt(((u - sg * c[1]) / c[3]) ^ 2
+                         + ((v - c[2]) / c[4]) ^ 2)
+          col = mix(col, c[5], ss(1.02, 0.62, d) * 0.90)
+        end
+      end
+    end
+    return col
+  end
   return RigSpecs.colour(spec, F, "__face", u * F.hrx + F.n / 2,
                          v * F.hry + F.hcy, F.n / 2, 0, 0, fz)
 end
