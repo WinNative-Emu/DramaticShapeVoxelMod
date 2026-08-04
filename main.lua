@@ -79,6 +79,7 @@ local VoxelGrid = V.require("VoxelGrid")
 local WorldCurve = V.require("WorldCurve")
 local OverworldBattle = V.require("OverworldBattle")
 local ActorHull = V.require("ActorHull")
+local ActorRig = V.require("ActorRig")
 local BattleExit = V.require("BattleExit")
 local DayNight = V.require("DayNight")
 local DayTint = V.require("DayTint")
@@ -218,6 +219,7 @@ mod.content.render_pipelines:register("voxel", {
     Voxel3D.invalidate()
     OverworldBattle.invalidate()
     ActorHull.invalidate()
+    ActorRig.invalidate()
     ChunkMesher.invalidate()   -- no map id = every cached mesh
   end,
 })

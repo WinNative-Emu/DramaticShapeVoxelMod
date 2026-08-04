@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.0
+
+TRUE 3D actors are now authored geometry rather than a carved silhouette.
+
+- `lib/ActorRig.lua` builds a character from signed distance fields on a 44^3
+  grid, extracts it with naive surface nets, relaxes the vertices, derives
+  normals from the field gradient and assigns a colour per vertex.
+- `lib/RigSpecs.lua` turns a declarative spec into that part list and evaluates
+  the surface decals -- eyes, brows, mouth, glasses, beard, garment bands.
+- `lib/RigCast.lua` carries the specs: Red, Blue, Oak, the nurse, the mart
+  clerk, the youngster, the lass, gramps, a Rocket grunt, Lance, Giovanni, the
+  scientist, the beauty, the hiker, the sailor, the biker, the gentleman, Koga
+  and Agatha, plus aliases for sprites that reuse those looks.
+- Per-vertex colour rides through the existing (position, uv, shade) vertex
+  format by way of a generated 32x32 palette image handed to the draw call, so
+  the mesh format and shader are untouched.
+- A sprite with no spec still falls back to the carved hull, so nothing that
+  worked in 1.4.0 stops working.
+
 ## 1.4.0
 
 ### Added

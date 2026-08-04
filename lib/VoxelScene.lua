@@ -18,6 +18,7 @@ local ShadowMap = V.require("ShadowMap")
 local ChunkMesher = V.require("ChunkMesher")
 local SpriteBillboards = V.require("SpriteBillboards")
 local ActorHull = V.require("ActorHull")
+local ActorRig = V.require("ActorRig")
 local TileShape = V.require("TileShape")
 local TerrainAtlas = V.require("TerrainAtlas")
 local Voxel = V.require("VoxelState")
@@ -259,6 +260,10 @@ local function hullFor(def, facing, phase, flip)
   local Voxel = V.require("VoxelState")
   if not Voxel.trueActors() then return nil end
   local frame, mirror = frameFor(def, facing, phase, flip)
+  local rig, rigTex = ActorRig.mesh(def, frame)
+  if rig then
+    return rig, (facing ~= "right") and mirror or false, rigTex
+  end
   local mesh = ActorHull.mesh(def, frame)
   if not mesh then return nil end
   return mesh, (facing ~= "right") and mirror or false
@@ -319,10 +324,10 @@ local function drawEntity(sprite, px, py, facing, phase, flip, gh, colors,
   -- LEANS BACK, pivoting at its feet, by exactly the camera's pitch, so
   -- at every tilt level the sprite reads face-on like the flat game.
   -- No camera-tracking yaw: every sprite leans in parallel.
-  local hull, hullMirror = hullFor(def, facing, phase, flip)
+  local hull, hullMirror, hullTex = hullFor(def, facing, phase, flip)
   if hull then
     local m = hullMatrix(px, py, y, facing, hullMirror)
-    Voxel3D.draw(hull, tex, m, billboardPull(), m)
+    Voxel3D.draw(hull, hullTex or tex, m, billboardPull(), m)
     return true
   end
 
@@ -603,9 +608,9 @@ local function castShadows(state, terrain, nbMesh, posed, cx, cy, vw, vh,
   end
   for _, p in ipairs(posed) do
     local def = p.sprite.def
-    local hull, hullMirror = hullFor(def, p.facing, p.phase, p.flip)
+    local hull, hullMirror, hullTex = hullFor(def, p.facing, p.phase, p.flip)
     if hull then
-      ShadowMap.draw(hull, p.sprite:resolveImage(),
+      ShadowMap.draw(hull, hullTex or p.sprite:resolveImage(),
                      hullMatrix(p.px, p.py, p.gh + (p.lift or 0), p.facing,
                                 hullMirror))
     else
