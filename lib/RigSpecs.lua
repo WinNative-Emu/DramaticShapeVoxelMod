@@ -326,10 +326,16 @@ local function ss(e0, e1, x)
   return t * t * (3 - 2 * t)
 end
 
+function RigSpecs.faceTexel(spec, F, u, v, fz)
+  return RigSpecs.colour(spec, F, "__face", u * F.hrx + F.n / 2,
+                         v * F.hry + F.hcy, F.n / 2, 0, 0, fz)
+end
+
 function RigSpecs.colour(spec, F, part, gx, gy, gz, nx, ny, nz)
   local pal = spec.palette
   local fit = spec.fit or {}
-  local base = pal[part] or pal.top or { 0.8, 0.8, 0.8 }
+  local base = pal[(part == "__face") and "head" or part]
+               or pal.top or { 0.8, 0.8, 0.8 }
   local col = { base[1], base[2], base[3] }
 
   local n = F.n
@@ -353,6 +359,10 @@ function RigSpecs.colour(spec, F, part, gx, gy, gz, nx, ny, nz)
   end
 
   if part == "head" then
+    return RigSpecs.faceTexel(spec, F, u, v, nz)
+  end
+
+  if part == "__face" then
     local e = spec.eye or DEFAULT_EYE
     local face = (nz > 0.10) and 1 or 0
     if face > 0 then

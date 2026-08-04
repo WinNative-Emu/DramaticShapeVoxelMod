@@ -8,9 +8,11 @@ local ActorRig = {}
 
 ActorRig.SIZE = 44
 
-local MAX_VERTS = 20000
-local PAL_W = 32
-local PAL_N = PAL_W * PAL_W
+local MAX_VERTS = 12000
+local TEX = 128
+local FACE = 96
+local PAL_Y0 = 96
+local PAL_N = (TEX - PAL_Y0) * TEX
 local SMOOTH_ROUNDS = 3
 local SMOOTH_W = 0.50
 
@@ -379,13 +381,27 @@ local function palettise(cols, count)
   return slot, pr, pg, pb, pn
 end
 
-local function paletteImage(pr, pg, pb, pn)
-  local ok, data = pcall(love.image.newImageData, PAL_W, PAL_W)
+local function buildTexture(pr, pg, pb, pn, spec, F)
+  local ok, data = pcall(love.image.newImageData, TEX, TEX)
   if not ok or not data then return nil end
+  local set = data.setPixel
   for p = 1, pn do
     local i = p - 1
-    pcall(data.setPixel, data, i % PAL_W, floor(i / PAL_W),
-          pr[p], pg[p], pb[p], 1)
+    pcall(set, data, i % TEX, PAL_Y0 + floor(i / TEX), pr[p], pg[p], pb[p], 1)
+  end
+  local TWO_PI = math.pi * 2
+  for j = 0, FACE - 1 do
+    local lat = (0.5 - (j + 0.5) / FACE) * math.pi
+    local cl = math.cos(lat)
+    local v = math.sin(lat)
+    for i = 0, FACE - 1 do
+      local lon = ((i + 0.5) / FACE - 0.5) * TWO_PI
+      local u = math.sin(lon) * cl
+      local fz = math.cos(lon) * cl
+      local c = RigSpecs.faceTexel(spec, F, u, v, fz)
+      pcall(set, data, i, j, c[1], c[2], c[3], 1)
+    end
+    Budget.tick()
   end
   local ok2, img = pcall(love.graphics.newImage, data)
   if not ok2 or not img then return nil end
@@ -480,36 +496,95 @@ local function build(spec, n)
     end
   end
 
-  local slot, pr, pg, pb, pn = palettise(soft, count)
-  local tex = paletteImage(pr, pg, pb, pn)
-  if not tex then return nil end
+  local tris = {}
+  local tn = 0
+  for q = 1, qn do
+    local Q = quads[q]
+    tn = tn + 1
+    tris[tn] = { Q[1], Q[2], Q[3] }
+    tn = tn + 1
+    tris[tn] = { Q[1], Q[3], Q[4] }
+  end
+
+  local headId = PART_ID.head
+  local pr, pg, pb, pn = {}, {}, {}, 0
+  local keys = {}
+  local function slotFor(r, g, b)
+    local qr = floor(r * 63 + 0.5)
+    local qg = floor(g * 63 + 0.5)
+    local qb = floor(b * 63 + 0.5)
+    local key = qr * 4096 + qg * 64 + qb
+    local at = keys[key]
+    if at then return at end
+    if pn >= PAL_N then return 1 end
+    pn = pn + 1
+    pr[pn], pg[pn], pb[pn] = qr / 63, qg / 63, qb / 63
+    keys[key] = pn
+    return pn
+  end
 
   local scale = 16.0 / n
+  local half = n / 2
+  local TWO_PI = math.pi * 2
   local verts = {}
+  local vn = 0
+  local headAt = {}
+
+  local function faceUV(i)
+    local hx = vx[i] - half
+    local hz = vz[i] - half
+    local hv = (vy[i] - F.hcy) / F.hry
+    if hv < -1 then hv = -1 elseif hv > 1 then hv = 1 end
+    local lon = math.atan2(hx, hz)
+    local lat = math.asin(hv)
+    return ((lon / TWO_PI + 0.5) * FACE + 0.5) / TEX,
+           ((0.5 - lat / math.pi) * FACE + 0.5) / TEX
+  end
+
   for i = 1, count do
-    local s = slot[i] - 1
-    verts[i] = { vx[i] * scale, vy[i] * scale, vz[i] * scale,
-                 (s % PAL_W + 0.5) / PAL_W,
-                 (floor(s / PAL_W) + 0.5) / PAL_W,
-                 shades[i] }
+    if ids[i] == headId then
+      local uu, vv = faceUV(i)
+      vn = vn + 1
+      verts[vn] = { vx[i] * scale, vy[i] * scale, vz[i] * scale, uu, vv,
+                    shades[i] }
+      headAt[i] = vn
+    end
   end
 
   local map = {}
   local mn = 0
-  for q = 1, qn do
-    local Q = quads[q]
-    map[mn + 1] = Q[1]
-    map[mn + 2] = Q[2]
-    map[mn + 3] = Q[3]
-    map[mn + 4] = Q[1]
-    map[mn + 5] = Q[3]
-    map[mn + 6] = Q[4]
-    mn = mn + 6
+  for t = 1, tn do
+    local T = tris[t]
+    local a, b, c = T[1], T[2], T[3]
+    if headAt[a] and headAt[b] and headAt[c] then
+      map[mn + 1] = headAt[a]
+      map[mn + 2] = headAt[b]
+      map[mn + 3] = headAt[c]
+      mn = mn + 3
+    else
+      local ca, cb, cc = soft[a], soft[b], soft[c]
+      local s = slotFor((ca[1] + cb[1] + cc[1]) / 3,
+                        (ca[2] + cb[2] + cc[2]) / 3,
+                        (ca[3] + cb[3] + cc[3]) / 3) - 1
+      local uu = (s % TEX + 0.5) / TEX
+      local vv = (PAL_Y0 + floor(s / TEX) + 0.5) / TEX
+      for _, k in ipairs(T) do
+        vn = vn + 1
+        verts[vn] = { vx[k] * scale, vy[k] * scale, vz[k] * scale, uu, vv,
+                      shades[k] }
+        mn = mn + 1
+        map[mn] = vn
+      end
+    end
+    if t % 1024 == 0 then Budget.tick() end
   end
+
+  local tex = buildTexture(pr, pg, pb, pn, spec, F)
+  if not tex then return nil end
 
   local mesh = Voxel3D.newMesh(verts, map)
   if not mesh then return nil end
-  return { mesh = mesh, tex = tex, verts = count, quads = qn }
+  return { mesh = mesh, tex = tex, verts = vn, quads = qn }
 end
 
 function ActorRig.has(def)

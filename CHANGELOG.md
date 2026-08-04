@@ -13,9 +13,18 @@ TRUE 3D actors are now authored geometry rather than a carved silhouette.
   clerk, the youngster, the lass, gramps, a Rocket grunt, Lance, Giovanni, the
   scientist, the beauty, the hiker, the sailor, the biker, the gentleman, Koga
   and Agatha, plus aliases for sprites that reuse those looks.
-- Per-vertex colour rides through the existing (position, uv, shade) vertex
-  format by way of a generated 32x32 palette image handed to the draw call, so
-  the mesh format and shader are untouched.
+- The head carries a real UV unwrap. Every head vertex takes an
+  equirectangular coordinate (longitude about the model's own axis, latitude
+  from its height) into a 96x96 face patch, and the eyes, brows, mouth,
+  glasses and beard are evaluated per TEXEL when that patch is painted. Face
+  detail no longer depends on how many vertices land on the face.
+- Away from the face, each triangle carries one flat coordinate into a palette
+  written below the patch. Sharing an interpolated palette coordinate between
+  two vertices of different colours sweeps the sample across every unrelated
+  entry between them, which fringes every material boundary; a flat coordinate
+  per triangle cannot.
+- Both live in one 128x128 image handed to the draw call, so the vertex format
+  (position, uv, shade) and the shader are untouched.
 - A sprite with no spec still falls back to the carved hull, so nothing that
   worked in 1.4.0 stops working.
 
