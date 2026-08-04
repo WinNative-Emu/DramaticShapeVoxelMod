@@ -1247,4 +1247,8 @@ M.unused_guard = M.guard
 M.gambler_asleep = M.gambler
 M.unused_gameboy_kid = M.gameboy_kid
 
+local PROPS = V.require("RigProps")
+for k, v in pairs(PROPS) do M[k] = v end
+M.unused_old_amber = M.old_amber
+
 return M

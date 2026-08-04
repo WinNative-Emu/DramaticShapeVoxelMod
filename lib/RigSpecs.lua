@@ -299,7 +299,52 @@ local function hatParts(F, t, out)
   end
 end
 
+local function runPrim(g, n, F, K, list)
+  local first = true
+  for _, op in ipairs(list) do
+    local kind = op[1]
+    local dst = first and g or K.tmp
+    if kind == "e" then
+      K.ellipsoid(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
+                  op[5] * F.s, op[6] * F.s, op[7] * F.s)
+    elseif kind == "c" then
+      K.capsule(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
+                op[5] * F.s, F.Y(op[6]), op[7] * F.s,
+                op[8] * F.s, op[9] * F.s)
+    elseif kind == "b" then
+      K.ellipsoid(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
+                  op[5] * F.s, op[6] * F.s, op[7] * F.s)
+      K.capsule(K.tmp, n, op[2] * F.s, F.Y(op[3] + op[6] / F.s * 0),
+                op[4] * F.s, op[2] * F.s, F.Y(op[3]), op[4] * F.s,
+                op[5] * F.s, op[5] * F.s)
+      dst = first and g or K.tmp
+    elseif kind == "t" then
+      K.capsule(dst, n, op[2] * F.s, F.Y(op[3]), op[4] * F.s - op[5] * F.s,
+                op[2] * F.s, F.Y(op[3]), op[4] * F.s + op[5] * F.s,
+                op[6] * F.s, op[6] * F.s)
+    elseif kind == "yb" then
+      K.clipBelow(g, K.cells, n, F.Y(op[2]))
+      dst = nil
+    end
+    if dst then
+      if first then first = false else K.union(g, K.tmp, K.cells) end
+    end
+  end
+end
+
+local function propParts(spec, F)
+  local out = {}
+  for _, part in ipairs(spec.parts) do
+    out[#out + 1] = P(part.id, part.k or (F.s * 0.55),
+                      function(g, n, F2, K)
+                        runPrim(g, n, F2, K, part.prim)
+                      end)
+  end
+  return out
+end
+
 function RigSpecs.parts(spec, F, K, pose)
+  if spec.props then return propParts(spec, F) end
   local fit = spec.fit or {}
   local out = {}
   out[#out + 1] = torsoPart(F, fit)
@@ -352,11 +397,42 @@ local function ss(e0, e1, x)
 end
 
 function RigSpecs.faceTexel(spec, F, u, v, fz)
+  if spec.props then return { 0, 0, 0 } end
   return RigSpecs.colour(spec, F, "__face", u * F.hrx + F.n / 2,
                          v * F.hry + F.hcy, F.n / 2, 0, 0, fz)
 end
 
+local function propColour(spec, F, part, gx, gy, gz, nx, ny, nz)
+  local def = nil
+  for _, p in ipairs(spec.parts) do
+    if p.id == part then def = p break end
+  end
+  if not def then def = spec.parts[1] end
+  local col = { def.c[1], def.c[2], def.c[3] }
+  local y = gy
+  for _, b in ipairs(def.bands or {}) do
+    local lo, hi = F.Y(b[2]), F.Y(b[1])
+    if y <= hi and y >= lo then col = { b[3][1], b[3][2], b[3][3] } end
+  end
+  if def.hi then col = mix(col, def.hi, ss(0.20, 0.92, ny) * 0.45) end
+  if def.sh then col = mix(col, def.sh, ss(0.05, -0.70, ny) * 0.45) end
+  if def.dot2 and nz > 0.30 then
+    local x = gx - F.n / 2
+    local d = sqrt(x * x + (y - F.Y(def.dot2[2])) ^ 2) / (def.dot2[3] * F.s)
+    col = mix(col, def.dot2[1], ss(1.02, 0.80, d) * 0.95)
+  end
+  if def.dot and nz > 0.30 then
+    local x = gx - F.n / 2
+    local d = sqrt(x * x + (y - F.Y(def.dot[2])) ^ 2) / (def.dot[3] * F.s)
+    col = mix(col, def.dot[1], ss(1.02, 0.80, d) * 0.98)
+  end
+  return col
+end
+
 function RigSpecs.colour(spec, F, part, gx, gy, gz, nx, ny, nz)
+  if spec.props then
+    return propColour(spec, F, part, gx, gy, gz, nx, ny, nz)
+  end
   local pal = spec.palette
   local fit = spec.fit or {}
   local base = pal[(part == "__face") and "head" or part]

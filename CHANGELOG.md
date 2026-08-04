@@ -14,6 +14,11 @@ TRUE 3D actors are now authored geometry rather than a carved silhouette.
   (the bird, the boulder, the fossil, the paper, the clipboard, the Pokedex,
   the poke ball, old amber, the fairy, the monster, Seel, Snorlax and the bike)
   keep the carved hull, which is the right answer for them.
+- `lib/RigProps.lua` covers the thirteen sheets that are not people, as their
+  own primitive lists rather than a humanoid skeleton: the poke ball, the
+  boulder, the fossil, old amber, the paper, the clipboard, the Pokedex, the
+  bird, the fairy, the monster, Seel, Snorlax and the bike. Every overworld
+  sprite is now modelled; nothing falls back to the carved hull.
 - Eye geometry is scaled centrally now that the decals are painted at texel
   rather than vertex resolution. Sizes carried over from the offline prototype
   read about a quarter too large once they are actually sharp.
