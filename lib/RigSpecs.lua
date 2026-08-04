@@ -81,51 +81,76 @@ local function collarPart(F, fit)
   end)
 end
 
-local function armPart(F)
+local STRIDE = {
+  stand = { legZ = { 0, 0 }, lift = { 0, 0 }, armZ = { 0, 0 } },
+  walk = { legZ = { 1.05, -0.78 }, lift = { 0.36, 0 },
+           armZ = { -0.95, 1.30 } },
+}
+
+local function sides(pose)
+  return STRIDE[pose] or STRIDE.stand
+end
+
+local function armPart(F, pose)
+  local w = sides(pose)
   return P("arm", F.thw * 0.17, function(g, n, F2, K)
-    K.capsule(g, n, -F2.armx, F2.armt, 0,
-              -F2.armx * 0.96, F2.armb, F2.armr * 0.3,
-              F2.armr, F2.armr * 0.84)
-    K.capsule(K.tmp, n, F2.armx, F2.armt, 0,
-              F2.armx * 0.96, F2.armb, F2.armr * 0.3,
-              F2.armr, F2.armr * 0.84)
+    for s = 1, 2 do
+      local sx = (s == 1) and -1 or 1
+      local dz = F2.armr * (0.3 + w.armZ[s])
+      local dst = (s == 1) and g or K.tmp
+      K.capsule(dst, n, sx * F2.armx, F2.armt, 0,
+                sx * F2.armx * 0.96, F2.armb, dz,
+                F2.armr, F2.armr * 0.84)
+    end
     K.union(g, K.tmp, K.cells)
   end)
 end
 
-local function handPart(F)
+local function handPart(F, pose)
+  local w = sides(pose)
   return P("hand", F.armr * 0.40, function(g, n, F2, K)
     local r = F2.armr * 0.92
-    K.ellipsoid(g, n, -F2.armx * 0.96, F2.armb - F2.armr * 0.35,
-                F2.armr * 0.3, r, r, r)
-    K.ellipsoid(K.tmp, n, F2.armx * 0.96, F2.armb - F2.armr * 0.35,
-                F2.armr * 0.3, r, r, r)
+    for s = 1, 2 do
+      local sx = (s == 1) and -1 or 1
+      local dz = F2.armr * (0.3 + w.armZ[s])
+      local dst = (s == 1) and g or K.tmp
+      K.ellipsoid(dst, n, sx * F2.armx * 0.96,
+                  F2.armb - F2.armr * 0.35, dz, r, r, r)
+    end
     K.union(g, K.tmp, K.cells)
   end)
 end
 
-local function legPart(F)
+local function legPart(F, pose)
+  local w = sides(pose)
   return P("leg", F.legr * 0.85, function(g, n, F2, K)
-    K.capsule(g, n, -F2.legx, F2.hipY + F2.legr * 0.3, 0,
-              -F2.legx, F2.footY + F2.legr * 1.1, 0,
-              F2.legr * 1.02, F2.legr * 0.86)
-    K.capsule(K.tmp, n, F2.legx, F2.hipY + F2.legr * 0.3, 0,
-              F2.legx, F2.footY + F2.legr * 1.1, 0,
-              F2.legr * 1.02, F2.legr * 0.86)
+    for s = 1, 2 do
+      local sx = (s == 1) and -1 or 1
+      local dst = (s == 1) and g or K.tmp
+      K.capsule(dst, n, sx * F2.legx, F2.hipY + F2.legr * 0.3, 0,
+                sx * F2.legx,
+                F2.footY + F2.legr * (1.1 + w.lift[s]),
+                F2.legr * w.legZ[s],
+                F2.legr * 1.02, F2.legr * 0.86)
+    end
     K.union(g, K.tmp, K.cells)
   end)
 end
 
-local function shoePart(F, fit)
+local function shoePart(F, fit, pose)
   local len = fit.shoeLen or 1.90
   local rr = fit.shoeR or 0.92
+  local w = sides(pose)
   return P("shoe", F.legr * 0.55, function(g, n, F2, K)
-    K.capsule(g, n, -F2.legx, F2.footY + F2.legr * 0.52, -F2.legr * 0.25,
-              -F2.legx, F2.footY + F2.legr * 0.52, F2.legr * len,
-              F2.legr * rr, F2.legr * 0.76)
-    K.capsule(K.tmp, n, F2.legx, F2.footY + F2.legr * 0.52, -F2.legr * 0.25,
-              F2.legx, F2.footY + F2.legr * 0.52, F2.legr * len,
-              F2.legr * rr, F2.legr * 0.76)
+    for s = 1, 2 do
+      local sx = (s == 1) and -1 or 1
+      local y = F2.footY + F2.legr * (0.52 + w.lift[s])
+      local z0 = F2.legr * (w.legZ[s] - 0.25)
+      local z1 = F2.legr * (w.legZ[s] + len)
+      local dst = (s == 1) and g or K.tmp
+      K.capsule(dst, n, sx * F2.legx, y, z0, sx * F2.legx, y, z1,
+                F2.legr * rr, F2.legr * 0.76)
+    end
     K.union(g, K.tmp, K.cells)
   end)
 end
@@ -274,14 +299,14 @@ local function hatParts(F, t, out)
   end
 end
 
-function RigSpecs.parts(spec, F, K)
+function RigSpecs.parts(spec, F, K, pose)
   local fit = spec.fit or {}
   local out = {}
   out[#out + 1] = torsoPart(F, fit)
-  out[#out + 1] = armPart(F)
-  out[#out + 1] = handPart(F)
-  out[#out + 1] = legPart(F)
-  out[#out + 1] = shoePart(F, fit)
+  out[#out + 1] = armPart(F, pose)
+  out[#out + 1] = handPart(F, pose)
+  out[#out + 1] = legPart(F, pose)
+  out[#out + 1] = shoePart(F, fit, pose)
   out[#out + 1] = neckPart(F)
   out[#out + 1] = collarPart(F, fit)
   local bottom = fit.bottom or "pants"

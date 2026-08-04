@@ -25,6 +25,12 @@ TRUE 3D actors are now authored geometry rather than a carved silhouette.
   per triangle cannot.
 - Both live in one 128x128 image handed to the draw call, so the vertex format
   (position, uv, shade) and the shader are untouched.
+- Rigged actors walk. A spec is built twice, once standing and once mid-stride,
+  and the engine's own rule picks between them -- six drawn frames means frame
+  three and up is a walk. The walking build swings one leg and its shoe forward
+  while the other trails, and swings the arms against them. The stride is
+  deliberately asymmetric because the walk frame is already mirrored for the
+  opposite step, so one build covers both halves of the cycle.
 - A sprite with no spec still falls back to the carved hull, so nothing that
   worked in 1.4.0 stops working.
 

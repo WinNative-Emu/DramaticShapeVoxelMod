@@ -420,7 +420,13 @@ local K = {
   union = unionInto,
 }
 
-local function buildField(spec, n)
+local function poseFor(def, frame)
+  local count = tonumber(def and def.frames) or 1
+  if count < 6 then return "stand" end
+  return ((tonumber(frame) or 0) >= 3) and "walk" or "stand"
+end
+
+local function buildField(spec, n, pose)
   local cells = ensureBuffers(n)
   for i = 1, cells do
     field[i] = VOID
@@ -431,7 +437,7 @@ local function buildField(spec, n)
   K.tmp = scratch2
   local F = RigSpecs.frame(spec, n)
   local g = scratch
-  local order = RigSpecs.parts(spec, F, K)
+  local order = RigSpecs.parts(spec, F, K, pose)
   for at, part in ipairs(order) do
     part.build(g, n, F, K)
     mergeInto(cells, g, part.id and PART_ID[part.id] or nil,
@@ -440,8 +446,8 @@ local function buildField(spec, n)
   return F
 end
 
-local function build(spec, n)
-  local F = buildField(spec, n)
+local function build(spec, n, pose)
+  local F = buildField(spec, n, pose)
   local index, vx, vy, vz, count = surfaceNets(n)
   if count < 32 then return nil end
   local quads, qn = buildQuads(n, index)
@@ -594,9 +600,10 @@ end
 function ActorRig.mesh(def, frame)
   local spec = RigSpecs.lookup(def and def.image)
   if not spec then return nil end
-  local key = spec.key
+  local pose = poseFor(def, frame)
+  local key = spec.key .. "#" .. pose
   if rigs[key] == nil then
-    local ok, rig = pcall(build, spec, ActorRig.SIZE)
+    local ok, rig = pcall(build, spec, ActorRig.SIZE, pose)
     rigs[key] = (ok and rig) or false
   end
   local rig = rigs[key]
@@ -604,9 +611,11 @@ function ActorRig.mesh(def, frame)
   return rig.mesh, rig.tex
 end
 
-function ActorRig.geometry(spec, n)
-  return build(spec, n or ActorRig.SIZE)
+function ActorRig.geometry(spec, n, pose)
+  return build(spec, n or ActorRig.SIZE, pose or "stand")
 end
+
+ActorRig.poseFor = poseFor
 
 function ActorRig.invalidate()
   for _, rig in pairs(rigs) do
