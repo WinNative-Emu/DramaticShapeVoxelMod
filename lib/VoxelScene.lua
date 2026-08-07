@@ -27,6 +27,7 @@ local DayNight = V.require("DayNight")
 local FirstPerson = V.require("FirstPerson")
 local BattleBillboard = V.require("BattleBillboard")
 local Pokedex = V.require("Pokedex")
+local Diorama = V.require("Diorama")
 local PaletteFX = require("src.render.PaletteFX")
 local Map = require("src.world.Map")
 
@@ -914,6 +915,20 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
   Voxel3D.glassNight = outdoor and DayNight.windowLight() or 0
   local g = VoxelScene.glintStep(glint, cx, cy)
   Voxel3D.glassPhase, Voxel3D.glassGlint = g.phase, g.amp
+  -- and the map's atmosphere, if it has one (see ForestAtmos): the haze
+  -- the scene shader folds every surface into, in the hour's colour.
+  -- nil for every map without an entry -- a clear day, exactly as before.
+  local ForestAtmos = V.require("ForestAtmos")
+  local atmos = ForestAtmos.frame(state.map)
+  Voxel3D.fog = atmos and atmos.fog or nil
+  -- and the DIORAMA modes' viewport and chroma key (lib/Diorama, driven by
+  -- the headset -- lib/VR sets them for the length of one frame). Both are
+  -- put back to nil at the end of this function, so no other pass in the
+  -- frame -- the battle screen's own arena shot above all -- can inherit a
+  -- cut world or a green background.
+  local dioFrame = (eyes and Diorama.on) and true or false
+  Voxel3D.cull = dioFrame and Diorama.cull or nil
+  Voxel3D.keyColor = dioFrame and Diorama.keyColor() or nil
 
   local function atlasFor(map)
     return TerrainAtlas.forMap(map, modeColors(paletteFor, map))
@@ -1152,6 +1167,14 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
                  ShadowMap.snug(Mat4.translate(nb.ox, 0, nb.oy)))
   end
 
+  -- The map's atmosphere -- god rays down from the invisible canopy, and
+  -- whatever drifts through them (see ForestAtmos). Additive over the
+  -- finished depth buffer, so the trees occlude the light and the light
+  -- writes nothing; here in the prop slot, after everything the beams
+  -- should fall across and inside drawScene so VR gets them per eye. On
+  -- the one map that has any, today.
+  ForestAtmos.draw(state.map)
+
   -- The VR pokedex in the player's left hand, last of all: a prop over
   -- the world drawn with real depth, so leaning it into a wall still
   -- occludes honestly. Its frame only exists while a session is live and
@@ -1185,12 +1208,19 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
 
   end   -- drawScene
 
+  -- the two diorama fields are this function's for the length of this
+  -- function, whichever way it leaves (see where they are set)
+  local function done(result)
+    Voxel3D.cull, Voxel3D.keyColor = nil, nil
+    return result
+  end
+
   if not eyes then
     if not Voxel3D.beginScene(w, h, cx, cy, vw, vh, skyFor(state.map)) then
-      return nil
+      return done(nil)
     end
     drawScene()
-    return Voxel3D.endScene()
+    return done(Voxel3D.endScene())
   end
 
   -- The VR frame: the same scene once per eye, each into its own named
@@ -1205,12 +1235,12 @@ function VoxelScene.render(state, w, h, vw, vh, paletteFor, eyes)
     if eye.adopt then FirstPerson.adoptVReye(eye.camera) end
     if not Voxel3D.beginScene(eye.w, eye.h, cx, cy, vw, vh,
                               skyFor(state.map), eye.slot) then
-      return nil
+      return done(nil)
     end
     drawScene()
     out[i] = Voxel3D.endScene()
   end
-  return out
+  return done(out)
 end
 
 return VoxelScene
